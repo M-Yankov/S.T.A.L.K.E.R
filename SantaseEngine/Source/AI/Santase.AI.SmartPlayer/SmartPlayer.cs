@@ -313,8 +313,7 @@
             foreach (var card in possibleCardsToPlay)
             {
                 if (card.Type == CardType.Queen
-                    && this.AnnounceValidator.GetPossibleAnnounce(this.Cards, card, context.TrumpCard)
-                    == Announce.Twenty)
+                    && this.AnnounceValidator.GetPossibleAnnounce(this.Cards, card, context.TrumpCard) == Announce.Twenty)
                 {
                     return this.PlayCard(card);
                 }

@@ -5,6 +5,7 @@
     using System.Linq;
     using System.Threading.Tasks;
 
+    using AI.StalkerPlayer;
     using Santase.AI.SmartPlayer;
     using Santase.Logic.Cards;
     using Santase.Logic.GameMechanics;
@@ -60,7 +61,7 @@
             this.uiPlayer.GameClosed += this.UiPlayerOnGameClosed;
             this.uiPlayer.GameEnded += this.UiPlayerOnGameEnded;
 
-            IPlayer smartPlayer = new SmartPlayer();
+            IPlayer smartPlayer = new SmartPlayer(); //// StalkerPlayer();
             this.game = new SantaseGame(this.uiPlayer, smartPlayer);
 
             this.PlayerCard.Transparent();
