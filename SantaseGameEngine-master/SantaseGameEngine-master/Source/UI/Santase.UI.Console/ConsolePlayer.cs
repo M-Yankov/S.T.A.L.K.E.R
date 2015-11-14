@@ -50,6 +50,7 @@
                     Console.Write("; [T]=Change trump");
                 }
 
+                //// Same as above. Should be PlayerAction.CloseGame() ?
                 if (this.PlayerActionValidator.IsValid(PlayerAction.ChangeTrump(), context, this.Cards))
                 {
                     Console.Write("; [C]=Close");
@@ -128,6 +129,13 @@
 
         private void PrintGameInfo(PlayerTurnContext context)
         {
+            //// This part must not be here but for now...
+            Console.SetCursorPosition(this.col, this.row);
+            foreach (var item in this.Cards)
+            {
+                Console.Write("{0} ", item);
+            }
+
             Console.SetCursorPosition(20, 9);
             Console.WriteLine($"{context.FirstPlayedCard} - {context.SecondPlayedCard}");
 
