@@ -61,7 +61,7 @@
             this.uiPlayer.GameClosed += this.UiPlayerOnGameClosed;
             this.uiPlayer.GameEnded += this.UiPlayerOnGameEnded;
 
-            IPlayer smartPlayer = new SmartPlayer(); //// StalkerPlayer();
+            IPlayer smartPlayer = new StalkerPlayer(); //// StalkerPlayer();
             this.game = new SantaseGame(this.uiPlayer, smartPlayer);
 
             this.PlayerCard.Transparent();
