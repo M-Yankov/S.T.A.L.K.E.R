@@ -79,7 +79,14 @@
             //// TOdo When To close the game
 
             //// ToDo if we are on turn must play first, else respond the first played card.
-            return this.SelectBestCard(context);
+            if (context.FirstPlayedCard != null)
+            {
+               var c = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards).First();
+                return this.PlayCard(c);
+            }
+
+            var action = this.SelectBestCard(context);
+            return action;
         }
 
         public override void EndTurn(PlayerTurnContext context)
@@ -90,14 +97,18 @@
             this.passedCards.Add(context.FirstPlayedCard);
             this.passedCards.Add(context.SecondPlayedCard);
 
-            this.allCards[context.FirstPlayedCard.Suit][context.FirstPlayedCard.Type] = CardStatus.Passed;
-            this.allCards[context.SecondPlayedCard.Suit][context.SecondPlayedCard.Type] = CardStatus.Passed;
+            if (context.FirstPlayedCard != null && context.SecondPlayedCard != null)
+            {
+                this.allCards[context.FirstPlayedCard.Suit][context.FirstPlayedCard.Type] = CardStatus.Passed;
+                this.allCards[context.SecondPlayedCard.Suit][context.SecondPlayedCard.Type] = CardStatus.Passed;
+            }
 
             base.EndTurn(context);
         }
 
         public override void EndRound()
         {
+            //// Todo: Record game points somewhere! public override void StartRound( here is the points!)
             this.passedCards.Clear();
             this.enemyCards.Clear();
             base.EndRound();
@@ -105,7 +116,7 @@
 
         private PlayerAction SelectBestCard(PlayerTurnContext context)
         {
-            //// Copied from dummy just while testing.
+            //// Are Possible cards equal to all cards of the bot when it is on turn.?
             ICollection<Card> possibleCardsToPlay = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards);
             string currentGameState = context.State.GetType().Name;
 
@@ -118,24 +129,91 @@
 
             if (currentGameState == GameStates.StartRoundState)
             {
-                Card smallestCard = this.Cards.Where(c => c.Suit != context.TrumpCard.Suit).OrderByDescending(c => c.GetValue()).First();
+                //// possible null value;
+                Card smallestCard = possibleCardsToPlay.Where(c => c.Suit != context.TrumpCard.Suit && c.Type != CardType.King && c.Type != CardType.Queen).OrderBy(c => c.GetValue()).First();
                 return this.PlayCard(smallestCard);
             }
             else if (currentGameState == GameStates.FinalRoundState && context.CardsLeftInDeck == 0)
             {
-                //// TODO:
-                //// if Cards in deck == 0; 100% know enemy cards
+                var cardsByPower = this.Cards.OrderByDescending(c => c.GetValue());
+                foreach (var card in cardsByPower)
+                {
+                    if (this.EnemyContainsLowerCardThan(card) && !this.EnemyContainsGreaterCardThan(card))
+                    {
+                        return this.PlayCard(card);
+                    }
 
+                }
+
+                bool enemyHasTrump = this.enemyCards.Any(c => c.Suit == context.TrumpCard.Suit);
+                Card cardThatEnemyHasNotAsSuit = this.GetCardWithSuitThatEnemyHasNot(enemyHasTrump);
+                return this.PlayCard(cardThatEnemyHasNotAsSuit);
             }
             else if (currentGameState == GameStates.TwoCardsLeftRoundState)
             {
-                //// TODO:
-                //// the status here is that we play first. So check is a big deal to take the trump card and if TRUE play a small lonely card from cardType
-                //// make groups then from group that has small count play smallest only if not a 10 or A;
+                //// get rid off card that has one member of its suit < 10; examples [9♦ J♦ J♣ Q♠ K♠ A♠] -> J♣, [10♦ 10♠ 9♦ K♦ J♣ Q♣] -> 9♦
+                var groupedCards = this.Cards.GroupBy(c => c.Suit).OrderBy(g => g.Count());
+
+                foreach (var group in groupedCards)
+                {
+                    if (group.Key == context.TrumpCard.Suit)
+                    {
+                        continue;
+                    }
+
+                    foreach (var card in group)
+                    {
+                        if (card.GetValue() < 10)
+                        {
+                            return this.PlayCard(card);
+                        }
+                    }
+                }
+
+                //// if our cards are something like [10♥ 10♣ 10♠ A♠ 10♦ A♦], :D just throw first non-trump; // it will be some of tens
+                cardToPlay = groupedCards.Last(g => g.Key != context.TrumpCard.Suit).First();
+            }
+
+            //// TODO currentState == MoreThanTwoCards => play something;
+            if (cardToPlay == null)
+            {
+                cardToPlay = possibleCardsToPlay.First(c => c.Suit != context.TrumpCard.Suit);
             }
 
             this.lastPlayerCardFromUs = cardToPlay;
             return this.PlayCard(cardToPlay);
+        }
+
+        private Card GetCardWithSuitThatEnemyHasNot(bool enemyHasATrumpCard)
+        {
+            var orderedCards = this.Cards.OrderBy(c => c.GetValue());
+            foreach (var card in orderedCards)
+            {
+                if (this.enemyCards.All(c => c.Suit != card.Suit))
+                {
+                    if (enemyHasATrumpCard)
+                    {
+                        return this.Cards.Where(c => c.Suit == card.Suit).OrderBy(c => c.GetValue()).First();
+                    }
+                    else
+                    {
+                        return this.Cards.Where(c => c.Suit == card.Suit).OrderByDescending(c => c.GetValue()).First();
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private bool EnemyContainsLowerCardThan(Card card)
+        {
+            //// Should fix expression to CardStatus.InEnemy. More correct;
+            return this.allCards[card.Suit].Any(c => c.Value == CardStatus.InDeckOrEnemy && new Card(card.Suit, c.Key).GetValue() < card.GetValue());
+        }
+
+        private bool EnemyContainsGreaterCardThan(Card card)
+        {
+            return this.allCards[card.Suit].Any(c => c.Value == CardStatus.InDeckOrEnemy && new Card(card.Suit, c.Key).GetValue() > card.GetValue());
         }
 
         private Card CheckForAnonuce(CardSuit trumpSuit, int cardsLeftInDeck, string isFirstState)
