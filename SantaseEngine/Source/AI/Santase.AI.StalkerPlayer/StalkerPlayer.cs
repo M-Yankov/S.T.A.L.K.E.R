@@ -51,7 +51,7 @@
                 this.allCards[otherCardFromAnnounce.Suit][otherCardFromAnnounce.Type] = CardStatus.InEnemy;
             }
 
-            //// Optimize if necessary.
+            //// Optimize if necessary.TODO: extract this logic in initialize method and then use overload method AddCard();
             foreach (Card card in this.Cards)
             {
                 this.allCards[card.Suit][card.Type] = CardStatus.InStalker;
@@ -64,6 +64,7 @@
 
             if (currentGameState == GameStates.FinalRoundState)
             {
+                //// To check if there are better variant.
                 this.enemyCards = new HashSet<Card>(this.cardsLeft);
                 if (context.FirstPlayedCard != null)
                 {
@@ -76,16 +77,19 @@
                 return this.ChangeTrump(context.TrumpCard);
             }
 
-            //// TOdo When To close the game
-
-            //// ToDo if we are on turn must play first, else respond the first played card.
+            //// ToDo fix response
             if (context.FirstPlayedCard != null)
             {
-               var c = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards).First();
-                return this.PlayCard(c);
+                var card = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards).FirstOrDefault(c => c.Suit != context.TrumpCard.Suit);
+                if (card == null)
+                {
+                    card = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards).FirstOrDefault();
+                }
+
+                return this.PlayCard(card);
             }
 
-            var action = this.SelectBestCard(context);
+            PlayerAction action = this.SelectBestCardWhenShouldPlayFirst(context);
             return action;
         }
 
@@ -106,17 +110,22 @@
             base.EndTurn(context);
         }
 
+        public override void AddCard(Card card)
+        {
+            //// Something strange happens here. When program stops here the Stalker player still have 5 cards, but UI player already played a card on the context.
+            base.AddCard(card);
+        }
+
         public override void EndRound()
         {
-            //// Todo: Record game points somewhere! public override void StartRound( here is the points!)
+            //// Todo: Record game points somewhere! solution: public override void StartRound( here is the points!)
             this.passedCards.Clear();
             this.enemyCards.Clear();
             base.EndRound();
         }
 
-        private PlayerAction SelectBestCard(PlayerTurnContext context)
+        private PlayerAction SelectBestCardWhenShouldPlayFirst(PlayerTurnContext context)
         {
-            //// Are Possible cards equal to all cards of the bot when it is on turn.?
             ICollection<Card> possibleCardsToPlay = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards);
             string currentGameState = context.State.GetType().Name;
 
@@ -130,7 +139,11 @@
             if (currentGameState == GameStates.StartRoundState)
             {
                 //// possible null value;
-                Card smallestCard = possibleCardsToPlay.Where(c => c.Suit != context.TrumpCard.Suit && c.Type != CardType.King && c.Type != CardType.Queen).OrderBy(c => c.GetValue()).First();
+                Card smallestCard = possibleCardsToPlay
+                    .Where(c => c.Suit != context.TrumpCard.Suit && c.Type != CardType.King && c.Type != CardType.Queen)
+                    .OrderBy(c => c.GetValue())
+                    .First();
+
                 return this.PlayCard(smallestCard);
             }
             else if (currentGameState == GameStates.FinalRoundState && context.CardsLeftInDeck == 0)
@@ -142,12 +155,51 @@
                     {
                         return this.PlayCard(card);
                     }
-
                 }
 
                 bool enemyHasTrump = this.enemyCards.Any(c => c.Suit == context.TrumpCard.Suit);
-                Card cardThatEnemyHasNotAsSuit = this.GetCardWithSuitThatEnemyHasNot(enemyHasTrump);
+                Card cardThatEnemyHasNotAsSuit = this.GetCardWithSuitThatEnemyHasNot(enemyHasTrump, context.TrumpCard.Suit);
+                if (cardThatEnemyHasNotAsSuit == null)
+                {
+                    cardThatEnemyHasNotAsSuit = cardsByPower.LastOrDefault();
+                }
+
                 return this.PlayCard(cardThatEnemyHasNotAsSuit);
+            }
+            else if (currentGameState == GameStates.FinalRoundState)
+            {
+                IEnumerable<Card> orderedByPower = this.Cards.OrderByDescending(c => c.GetValue());
+                Card trump = orderedByPower.FirstOrDefault(c => c.Suit == context.TrumpCard.Suit);
+
+                //// Another method for this.
+                if (trump != null && !this.EnemyContainsGreaterCardThan(trump))
+                {
+                    return this.PlayCard(trump);
+                }
+
+                foreach (var card in orderedByPower)
+                {
+                    //// Another method for this.
+                    if (this.EnemyContainsLowerCardThan(card))
+                    {
+                        return this.PlayCard(card);
+                    }
+                }
+
+                //// must not come here, bu just for any case. Fix this also TODO:
+                /*var gropuedByMostPlayedSuit = this.allCards.GroupBy(s => s.Value).OrderBy(t => t.Key.Values.Count(v => v == CardStatus.Passed));
+                foreach (var group in gropuedByMostPlayedSuit)
+                {
+                    Card fromMostPlayedSuit = this.Cards.First(c => c.Suit == group.Key.Values);
+                    if (fromMostPlayedSuit == null)
+                    {
+                        continue;
+                    }
+                    else
+                    {
+                        return this.PlayCard(fromMostPlayedSuit);
+                    }
+                }*/
             }
             else if (currentGameState == GameStates.TwoCardsLeftRoundState)
             {
@@ -173,19 +225,87 @@
                 //// if our cards are something like [10♥ 10♣ 10♠ A♠ 10♦ A♦], :D just throw first non-trump; // it will be some of tens
                 cardToPlay = groupedCards.Last(g => g.Key != context.TrumpCard.Suit).First();
             }
+            else if (currentGameState == GameStates.MoreThanTwoCardsLeftRoundState)
+            {
+                if (this.CanCloseTheGame(context) && context.State.CanClose)
+                {
+                    return this.CloseGame();
+                }
 
-            //// TODO currentState == MoreThanTwoCards => play something;
-            if (cardToPlay == null)
+                IEnumerable<Card> nonTrumpCards = this.Cards.Where(c => c.Suit != context.TrumpCard.Suit).OrderBy(c => c.GetValue());
+                foreach (var card in nonTrumpCards)
+                {
+                    if (card.Type != CardType.King && card.Type != CardType.Queen)
+                    {
+                        return this.PlayCard(card);
+                        //// when it's 10 to check where is the Ace;
+                    }
+                    else if (!this.IsCardWaitsForAnnounce(card))
+                    {
+                        return this.PlayCard(card);
+                    }
+                }
+            }
+
+            /*if (cardToPlay == null)
             {
                 cardToPlay = possibleCardsToPlay.First(c => c.Suit != context.TrumpCard.Suit);
-            }
+            }*/
 
             this.lastPlayerCardFromUs = cardToPlay;
             return this.PlayCard(cardToPlay);
         }
 
-        private Card GetCardWithSuitThatEnemyHasNot(bool enemyHasATrumpCard)
+        private bool IsCardWaitsForAnnounce(Card card)
         {
+            CardType otherTypeForAnnounce = card.Type == CardType.King ? CardType.Queen : CardType.King;
+            CardStatus statusOfOtherCard = this.allCards[card.Suit][otherTypeForAnnounce];
+            if (statusOfOtherCard == CardStatus.InDeckOrEnemy)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool CanCloseTheGame(PlayerTurnContext context)
+        {
+            //// When we have A and 10 from trumps; necessary points && some other winning cards
+            //// In the current context we are first player.
+            bool hasNecessaryTrumps = this.allCards[context.TrumpCard.Suit][CardType.Ten] == CardStatus.InStalker &&
+                                      this.allCards[context.TrumpCard.Suit][CardType.Ten] == CardStatus.InStalker;
+            bool hasNecessaryPoints = this.Cards.Sum(c => c.GetValue()) + context.FirstPlayerRoundPoints > 60;
+
+            int sureWiningCards = 0;
+            foreach (var card in this.Cards)
+            {
+                //// Make another method for this.
+                if (!this.EnemyContainsGreaterCardThan(card))
+                {
+                    sureWiningCards++;
+                }
+            }
+
+            if (hasNecessaryTrumps && hasNecessaryPoints && sureWiningCards > 1)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private Card GetCardWithSuitThatEnemyHasNot(bool enemyHasATrumpCard, CardSuit trummpSuit)
+        {
+            if (!enemyHasATrumpCard)
+            {
+                //// if enemy has not trumps and we have a trump, should throw a trump;
+                IEnumerable<Card> myTrumpCars = this.Cards.Where(c => c.Suit == trummpSuit);
+                if (myTrumpCars.Count() > 0)
+                {
+                    return myTrumpCars.OrderBy(c => c.GetValue()).LastOrDefault();
+                }
+            }
+
             var orderedCards = this.Cards.OrderBy(c => c.GetValue());
             foreach (var card in orderedCards)
             {
@@ -216,9 +336,9 @@
             return this.allCards[card.Suit].Any(c => c.Value == CardStatus.InDeckOrEnemy && new Card(card.Suit, c.Key).GetValue() > card.GetValue());
         }
 
-        private Card CheckForAnonuce(CardSuit trumpSuit, int cardsLeftInDeck, string isFirstState)
+        private Card CheckForAnonuce(CardSuit trumpSuit, int cardsLeftInDeck, string state)
         {
-            if (isFirstState == GameStates.StartRoundState)
+            if (state == GameStates.StartRoundState)
             {
                 return null;
             }
