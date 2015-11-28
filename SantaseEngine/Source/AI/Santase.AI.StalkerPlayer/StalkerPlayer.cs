@@ -50,31 +50,28 @@
                 this.enemyCards.Add(otherCardFromAnnounce);
                 this.allCards[otherCardFromAnnounce.Suit][otherCardFromAnnounce.Type] = CardStatus.InEnemy;
             }
+            
 
-            //// Optimize if necessary.TODO: extract this logic in initialize method and then use overload method AddCard();
-            foreach (Card card in this.Cards)
+
+            if (currentGameState == GameStates.FinalRoundState && this.Cards.Count == 6)
             {
-                this.allCards[card.Suit][card.Type] = CardStatus.InStalker;
+                this.enemyCards = this.ProvideEnemyCards(context);
 
-                if (this.cardsLeft.Contains(card))
-                {
-                    this.cardsLeft.Remove(card);
-                }
-            }
-
-            if (currentGameState == GameStates.FinalRoundState)
-            {
-                //// To check if there are better variant.
-                this.enemyCards = new HashSet<Card>(this.cardsLeft);
+                /*this.enemyCards = new HashSet<Card>(this.cardsLeft);
                 if (context.FirstPlayedCard != null)
                 {
                     this.enemyCards.Remove(context.FirstPlayedCard);
-                }
+                }*/
             }
 
             if (this.PlayerActionValidator.IsValid(PlayerAction.ChangeTrump(), context, this.Cards))
             {
                 return this.ChangeTrump(context.TrumpCard);
+            }
+
+            if (this.Cards.Count == 1)
+            {
+                return this.PlayCard(this.Cards.First());
             }
 
             //// ToDo fix response
@@ -93,13 +90,42 @@
             return action;
         }
 
+        private HashSet<Card> ProvideEnemyCards(PlayerTurnContext context)
+        {
+            HashSet<Card> result = new HashSet<Card>();
+            foreach (var groupSuit in this.allCards)
+            {
+                foreach (var pair in groupSuit.Value)
+                {
+                    if (pair.Value == CardStatus.InDeckOrEnemy || pair.Value == CardStatus.InEnemy)
+                    {
+
+                        result.Add(new Card(groupSuit.Key, pair.Key));
+                    }
+                }
+            }
+
+            if (context.FirstPlayedCard != null)
+            {
+                result.Remove(context.FirstPlayedCard);
+            }
+
+            return result;
+        }
+
         public override void EndTurn(PlayerTurnContext context)
         {
-            this.cardsLeft.Remove(context.FirstPlayedCard);
-            this.cardsLeft.Remove(context.SecondPlayedCard);
+            // this.cardsLeft.Remove(context.FirstPlayedCard);
+            // this.cardsLeft.Remove(context.SecondPlayedCard);
+               
+            // this.passedCards.Add(context.FirstPlayedCard);
+            // this.passedCards.Add(context.SecondPlayedCard);0
 
-            this.passedCards.Add(context.FirstPlayedCard);
-            this.passedCards.Add(context.SecondPlayedCard);
+            if (this.Cards.Count <= 6)
+            {
+                this.enemyCards.Remove(context.FirstPlayedCard);
+                this.enemyCards.Remove(context.SecondPlayedCard);
+            }
 
             if (context.FirstPlayedCard != null && context.SecondPlayedCard != null)
             {
@@ -112,6 +138,8 @@
 
         public override void AddCard(Card card)
         {
+            this.allCards[card.Suit][card.Type] = CardStatus.InStalker;
+
             //// Something strange happens here. When program stops here the Stalker player still have 5 cards, but UI player already played a card on the context.
             base.AddCard(card);
         }
@@ -126,7 +154,7 @@
 
         private PlayerAction SelectBestCardWhenShouldPlayFirst(PlayerTurnContext context)
         {
-            ICollection<Card> possibleCardsToPlay = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards);
+            //// ICollection<Card> possibleCardsToPlay = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards);
             string currentGameState = context.State.GetType().Name;
 
             Card cardToPlay = this.CheckForAnonuce(context.TrumpCard.Suit, context.CardsLeftInDeck, currentGameState);
@@ -139,7 +167,7 @@
             if (currentGameState == GameStates.StartRoundState)
             {
                 //// possible null value;
-                Card smallestCard = possibleCardsToPlay
+                Card smallestCard = this.Cards
                     .Where(c => c.Suit != context.TrumpCard.Suit && c.Type != CardType.King && c.Type != CardType.Queen)
                     .OrderBy(c => c.GetValue())
                     .First();
@@ -411,6 +439,16 @@
 
         private IList<Card> InitizlizeCardsLeft()
         {
+            foreach (Card card in this.Cards)
+            {
+                this.allCards[card.Suit][card.Type] = CardStatus.InStalker;
+
+                if (this.cardsLeft.Contains(card))
+                {
+                    this.cardsLeft.Remove(card);
+                }
+            }
+
             var result = new List<Card>();
             CardSuit[] cardSuits = new[] { CardSuit.Club, CardSuit.Diamond, CardSuit.Heart, CardSuit.Spade };
             CardType[] cardTypes = new[] { CardType.Ace, CardType.Ten, CardType.King, CardType.Queen, CardType.Jack, CardType.Nine };
