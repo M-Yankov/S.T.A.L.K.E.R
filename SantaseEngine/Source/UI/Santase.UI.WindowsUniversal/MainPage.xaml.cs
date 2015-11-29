@@ -28,18 +28,18 @@
         {
             this.InitializeComponent();
 
-            if (AnalyticsInfo.VersionInfo.DeviceFamily == "Windows.Desktop")
-            {
-                this.AdRow.Height = new GridLength(90);
-                this.AdMediator_2D55AF.Height = 90;
-                this.AdMediator_2D55AF.Width = 768;
-            }
-            else
-            {
-                this.AdRow.Height = new GridLength(80);
-                this.AdMediator_2D55AF.Height = 80;
-                this.AdMediator_2D55AF.Width = 480;
-            }
+            //if (AnalyticsInfo.VersionInfo.DeviceFamily == "Windows.Desktop")
+            //{
+            //    this.AdRow.Height = new GridLength(90);
+            //    this.AdMediator_2D55AF.Height = 90;
+            //    this.AdMediator_2D55AF.Width = 768;
+            //}
+            //else
+            //{
+            //    this.AdRow.Height = new GridLength(80);
+            //    this.AdMediator_2D55AF.Height = 80;
+            //    this.AdMediator_2D55AF.Width = 480;
+            //}
 
             this.playerCardControls = new[]
                                           {
