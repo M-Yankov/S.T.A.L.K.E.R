@@ -39,7 +39,7 @@
             //// get cards left
             if (currentGameState == GameStates.StartRoundState)
             {
-                this.cardsLeft = this.InitizlizeCardsLeft();
+                this.cardsLeft = this.InitializeCardsLeft();
             }
 
             if (context.FirstPlayerAnnounce != Announce.None)
@@ -76,7 +76,11 @@
             //// ToDo fix response
             if (context.FirstPlayedCard != null)
             {
-                var card = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards).FirstOrDefault(c => c.Suit != context.TrumpCard.Suit);
+                var card = this.PlayerActionValidator
+                    .GetPossibleCardsToPlay(context, this.Cards)
+                    .OrderByDescending(c => c.GetValue())
+                    .FirstOrDefault(c => c.Suit != context.TrumpCard.Suit);
+
                 if (card == null)
                 {
                     card = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards).FirstOrDefault();
@@ -136,7 +140,7 @@
         {
             string currentGameState = context.State.GetType().Name;
 
-            Card cardToPlay = this.CheckForAnonuce(context.TrumpCard.Suit, context.CardsLeftInDeck, currentGameState);
+            Card cardToPlay = this.CheckForAnounce(context.TrumpCard.Suit, context.CardsLeftInDeck, currentGameState);
 
             if (cardToPlay != null)
             {
@@ -318,15 +322,15 @@
             return false;
         }
 
-        private Card GetCardWithSuitThatEnemyHasNot(bool enemyHasATrumpCard, CardSuit trummpSuit)
+        private Card GetCardWithSuitThatEnemyHasNot(bool enemyHasATrumpCard, CardSuit trumpSuit)
         {
             if (!enemyHasATrumpCard)
             {
                 //// if enemy has not trumps and we have a trump, should throw a trump;
-                IEnumerable<Card> myTrumpCars = this.Cards.Where(c => c.Suit == trummpSuit);
-                if (myTrumpCars.Count() > 0)
+                IEnumerable<Card> myTrumpCards = this.Cards.Where(c => c.Suit == trumpSuit);
+                if (myTrumpCards.Count() > 0)
                 {
-                    return myTrumpCars.OrderBy(c => c.GetValue()).LastOrDefault();
+                    return myTrumpCards.OrderBy(c => c.GetValue()).LastOrDefault();
                 }
             }
 
@@ -395,7 +399,7 @@
             return this.allCards[card.Suit].Any(c => c.Value == CardStatus.InDeckOrEnemy && new Card(card.Suit, c.Key).GetValue() < card.GetValue());
         }
 
-        private Card CheckForAnonuce(CardSuit trumpSuit, int cardsLeftInDeck, string state)
+        private Card CheckForAnounce(CardSuit trumpSuit, int cardsLeftInDeck, string state)
         {
             if (state == GameStates.StartRoundState)
             {
@@ -468,7 +472,7 @@
             }
         }
 
-        private IList<Card> InitizlizeCardsLeft()
+        private IList<Card> InitializeCardsLeft()
         {
             foreach (Card card in this.Cards)
             {
