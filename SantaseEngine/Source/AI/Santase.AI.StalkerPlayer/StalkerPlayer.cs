@@ -72,16 +72,44 @@
             {
                 var enemyCard = context.FirstPlayedCard;
                 int enemyCardPriority = this.GetCardPriority(enemyCard);
-
-                var card = this.PlayerActionValidator
-                    .GetPossibleCardsToPlay(context, this.Cards)
-                    .OrderBy(c => c.GetValue())
-                    .FirstOrDefault(c => c.Suit != context.TrumpCard.Suit);
-
-                if (card == null)
+                var possibleCards = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards);
+                var trumpSuit = context.TrumpCard.Suit;
+                // Use trump to take high card
+                if (enemyCardPriority == 2 && enemyCard.Suit != trumpSuit && possibleCards.Any(c => c.Suit == trumpSuit))
                 {
-                    card = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards).FirstOrDefault();
+                    // TODO: Refactor this to achieve HQC
+                    var trump =
+                       possibleCards.Where(c => c.Suit == context.TrumpCard.Suit)
+                            .OrderBy(this.GetCardPriority)
+                            .FirstOrDefault();
+                    return this.PlayCard(trump);
                 }
+
+                if (possibleCards.Any(c => c.Suit == enemyCard.Suit && c.GetValue() > enemyCard.GetValue()))
+                {
+                    // TODO: Refactor this to achieve HQC
+                    var higherCard =
+                        possibleCards.Where(c => c.Suit == enemyCard.Suit).OrderBy(c => c.GetValue()).LastOrDefault();
+                           
+                    return this.PlayCard(higherCard);
+                }
+
+                Card card;
+                card = possibleCards.Where(c => c.Suit != trumpSuit).OrderBy(c => c.GetValue()).FirstOrDefault();
+                if (context.State.ShouldObserveRules)
+                {
+                    card = this.ChooseCardToPlay(this.allCards, context, possibleCards);
+                }
+
+                //var card = this.PlayerActionValidator
+                //    .GetPossibleCardsToPlay(context, this.Cards)
+                //    .OrderBy(c => c.GetValue())
+                //    .FirstOrDefault(c => c.Suit != context.TrumpCard.Suit);
+
+                //if (card == null)
+                //{
+                //    card = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards).FirstOrDefault();
+                //}
 
                 return this.PlayCard(card);
             }
@@ -210,15 +238,8 @@
             }
             else if (currentGameState == GameStates.TwoCardsLeftRoundState)
             {
-                int priority = this.GetCardPriority(context.TrumpCard);
-                if (priority > 0)
-                {
-                    cardToPlay = this.Cards.Where(g => g.Suit != context.TrumpCard.Suit).OrderBy(x => x.GetValue()).First();
-                }
-                else
-                {
-                    //// TODO Not Implemented
-                }
+                cardToPlay =
+                    this.Cards.Where(c => c.Suit != context.TrumpCard.Suit).OrderBy(c => c.GetValue()).FirstOrDefault();
             }
             else if (currentGameState == GameStates.MoreThanTwoCardsLeftRoundState)
             {
@@ -588,10 +609,10 @@
                 int suit = (int)card.Suit;
                 availableSuits[suit]++;
             }
-
+            
             for (int i = 0; i < suitsPriorities.Length; i++)
             {
-                if ((int)trumpSuit != i || availableSuits[i] == 0)
+                if ((int)trumpSuit == i || availableSuits[i] == 0)
                 {
                     continue;
                 }
@@ -604,13 +625,23 @@
             }
 
             // Select the cards from the best suit
-            var cardsFromBestSuit = stalkerCards.Where(card => card.Suit == (CardSuit)highestPrioritySuit).ToList();
+            var cardsFromBestSuit = stalkerCards.Where(card => card.Suit == (CardSuit)highestPrioritySuit).OrderBy(this.GetCardPriority).ToList();
+            var cardsFromTrump = stalkerCards.Where(card => card.Suit == trumpSuit).OrderBy(this.GetCardPriority).ToList();
+
 
             // Sort cards by its priority
-            var cardsToChooseFrom = cardsFromBestSuit.OrderBy(this.GetCardPriority);
+            var cardsToChooseFrom  = new List<Card>();
+            if (cardsFromBestSuit.Count != 0)
+            {
+                cardsToChooseFrom = cardsFromBestSuit;
+            }
+            else
+            {
+                cardsToChooseFrom = cardsFromTrump;
+            }
 
             // THIS NUMBER WILL AFFECT THE DECISION OF THE STALKER
-            if (priorityValue < 2)
+            if (priorityValue < 1)
             {
                 return cardsToChooseFrom.LastOrDefault();
             }
