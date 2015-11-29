@@ -10,7 +10,6 @@
 
     public class StalkerPlayer : BasePlayer
     {
-        //private readonly IList<Card> passedCards = new List<Card>(24);
         private readonly CardSuit[] cardSuits = new[] { CardSuit.Club, CardSuit.Diamond, CardSuit.Heart, CardSuit.Spade };
         private readonly CardType[] cardTypes = new[] { CardType.Ace, CardType.Ten, CardType.King, CardType.Queen, CardType.Jack, CardType.Nine };
         private HashSet<Card> enemyCards = new HashSet<Card>();
@@ -208,28 +207,15 @@
             }
             else if (currentGameState == GameStates.TwoCardsLeftRoundState)
             {
-                //// get rid off card that has one member of its suit < 10; examples [9♦ J♦ J♣ Q♠ K♠ A♠] -> J♣, [10♦ 10♠ 9♦ K♦ J♣ Q♣] -> 9♦
-                var groupedCards = this.Cards.GroupBy(c => c.Suit).OrderBy(g => g.Count());
-
-                foreach (var group in groupedCards)
+                int priority = this.GetCardPriority(context.TrumpCard);
+                if (priority > 0)
                 {
-                    if (group.Key == context.TrumpCard.Suit)
-                    {
-                        continue;
-                    }
-
-                    foreach (var card in group)
-                    {
-                        if (card.GetValue() < 10)
-                        {
-                            return this.PlayCard(card);
-                        }
-                    }
+                    cardToPlay = this.Cards.Where(g => g.Suit != context.TrumpCard.Suit).OrderBy(x => x.GetValue()).First();
                 }
-
-                //// if our cards are something like [10♥ 10♣ 10♠ A♠ 10♦ A♦], :D just throw first non-trump; // it will be some of tens
-                //// or trump suit is ♦ and cards are[9♦ J♦ K♦ 10♦ 10♣ A♥] -> 9♦ is it good enough?
-                cardToPlay = groupedCards.Last(g => g.Key != context.TrumpCard.Suit).First();
+                else
+                {
+                    //// TODO Not Implemented
+                }
             }
             else if (currentGameState == GameStates.MoreThanTwoCardsLeftRoundState)
             {
@@ -249,16 +235,6 @@
                         case CardType.Jack:
                             return this.PlayCard(card);
 
-                        // case CardType.Ten:
-                        //    {
-                        //        if (this.allCards[card.Suit][CardType.Ace] == CardStatus.Passed ||
-                        //         this.allCards[card.Suit][CardType.Ace] == CardStatus.InStalker)
-                        //        {
-                        //            return this.PlayCard(card);
-                        //        }
-
-                        // break;
-                        // }
                         case CardType.Queen:
                             {
                                 if (!this.IsCardWaitsForAnnounce(card))
@@ -281,7 +257,7 @@
                     }
                 }
 
-                cardToPlay = nonTrumpCards.First();
+                cardToPlay = nonTrumpCards.FirstOrDefault();
             }
 
             /*if (cardToPlay == null)
@@ -290,6 +266,27 @@
             }*/
 
             return this.PlayCard(cardToPlay);
+        }
+
+        private int GetCardPriority(Card card)
+        {
+            switch (card.Type)
+            {
+                case CardType.Nine:
+                    return 0;
+                case CardType.Jack:
+                    return 0;
+                case CardType.Queen:
+                    return 1;
+                case CardType.King:
+                    return 1;
+                case CardType.Ace:
+                    return 2;
+                case CardType.Ten:
+                    return 2;
+                default:
+                    return 0;
+            }
         }
 
         private bool IsCardWaitsForAnnounce(Card card)
