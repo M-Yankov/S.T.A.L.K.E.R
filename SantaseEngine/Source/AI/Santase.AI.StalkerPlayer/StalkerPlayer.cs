@@ -36,7 +36,7 @@
             string currentGameState = context.State.GetType().Name;
 
             //// get cards left
-           if (context.FirstPlayerAnnounce != Announce.None)
+            if (context.FirstPlayerAnnounce != Announce.None)
             {
                 //// If enemy has announce, add other card from announce to enemy card collection.
                 CardType otherTypeFromAnnounce = context.FirstPlayedCard.Type == CardType.King ? CardType.Queen : CardType.King;
@@ -70,6 +70,9 @@
             //// ToDo fix response
             if (context.FirstPlayedCard != null)
             {
+                var enemyCard = context.FirstPlayedCard;
+                int enemyCardPriority = this.GetCardPriority(enemyCard);
+
                 var card = this.PlayerActionValidator
                     .GetPossibleCardsToPlay(context, this.Cards)
                     .OrderBy(c => c.GetValue())
@@ -517,6 +520,102 @@
                     }
                 }
             }
+        }
+
+        public int GetSuitPriority(
+            IDictionary<CardSuit, Dictionary<CardType, CardStatus>> allCardsToCheck,
+            CardSuit cardSuit)
+        {
+            return allCardsToCheck[cardSuit].Count(card => card.Value == CardStatus.Passed || card.Value == CardStatus.InStalker);
+        }
+
+        public int GetTrumpPriority(
+            IDictionary<CardSuit, Dictionary<CardType, CardStatus>> allCardsToCheck, CardSuit trumpSuit, PlayerTurnContext context)
+        {
+            var countOfTrump = this.GetSuitPriority(allCardsToCheck, trumpSuit);
+            if (context.CardsLeftInDeck != 0)
+            {
+                countOfTrump++;
+            }
+
+            return countOfTrump;
+        }
+
+        public int[] GetPriorityForEachSuit(
+            IDictionary<CardSuit, Dictionary<CardType, CardStatus>> allCardsToCheck, PlayerTurnContext context)
+        {
+            var prioritiesPerSuit = new int[4];
+            var trumpSuit = context.TrumpCard.Suit;
+            var trumpPriority = this.GetTrumpPriority(allCardsToCheck, trumpSuit, context);
+
+            if (context.State.ShouldObserveRules)
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    if ((int)trumpSuit != i)
+                    {
+                        prioritiesPerSuit[i] = this.GetSuitPriority(allCardsToCheck, (CardSuit)i) - trumpPriority;
+                    }
+                }
+            }
+            else
+            {
+                for (int i = 0; i < prioritiesPerSuit.Length; i++)
+                {
+                    prioritiesPerSuit[i] = trumpPriority;
+                }
+            }
+
+            return prioritiesPerSuit;
+        }
+
+        public Card ChooseCardToPlay(
+            IDictionary<CardSuit, Dictionary<CardType, CardStatus>> allCardsToCheck,
+            PlayerTurnContext context,
+            ICollection<Card> stalkerCards)
+        {
+            var trumpSuit = context.TrumpCard.Suit;
+            int highestPrioritySuit = 0;
+            int priorityValue = Int32.MaxValue;
+
+            // Get priorities for all suits
+            var suitsPriorities = this.GetPriorityForEachSuit(allCardsToCheck, context);
+
+            // Check which suits are available
+            var availableSuits = new int[4];
+            foreach (var card in stalkerCards)
+            {
+                int suit = (int)card.Suit;
+                availableSuits[suit]++;
+            }
+
+            for (int i = 0; i < suitsPriorities.Length; i++)
+            {
+                if ((int)trumpSuit != i || availableSuits[i] == 0)
+                {
+                    continue;
+                }
+
+                if (suitsPriorities[i] < priorityValue)
+                {
+                    highestPrioritySuit = i;
+                    priorityValue = suitsPriorities[i];
+                }
+            }
+
+            // Select the cards from the best suit
+            var cardsFromBestSuit = stalkerCards.Where(card => card.Suit == (CardSuit)highestPrioritySuit).ToList();
+
+            // Sort cards by its priority
+            var cardsToChooseFrom = cardsFromBestSuit.OrderBy(this.GetCardPriority);
+
+            // THIS NUMBER WILL AFFECT THE DECISION OF THE STALKER
+            if (priorityValue < 2)
+            {
+                return cardsToChooseFrom.LastOrDefault();
+            }
+
+            return cardsToChooseFrom.FirstOrDefault();
         }
     }
 }
