@@ -10,14 +10,14 @@
 
     public class StalkerPlayer : BasePlayer
     {
-        private readonly IList<Card> passedCards = new List<Card>(24);
+        //private readonly IList<Card> passedCards = new List<Card>(24);
+        private readonly CardSuit[] cardSuits = new[] { CardSuit.Club, CardSuit.Diamond, CardSuit.Heart, CardSuit.Spade };
+        private readonly CardType[] cardTypes = new[] { CardType.Ace, CardType.Ten, CardType.King, CardType.Queen, CardType.Jack, CardType.Nine };
         private HashSet<Card> enemyCards = new HashSet<Card>();
         private IList<Card> cardsLeft = new List<Card>(24);
         private Dictionary<CardSuit, Dictionary<CardType, CardStatus>> allCards;
         private Card lastPlayerCardFromUs;
         private EnemyPlayerStatistics enemyStats;
-        private CardSuit[] cardSuits = new[] { CardSuit.Club, CardSuit.Diamond, CardSuit.Heart, CardSuit.Spade };
-        private CardType[] cardTypes = new[] { CardType.Ace, CardType.Ten, CardType.King, CardType.Queen, CardType.Jack, CardType.Nine };
 
         public StalkerPlayer()
         {
@@ -37,12 +37,7 @@
             string currentGameState = context.State.GetType().Name;
 
             //// get cards left
-            if (currentGameState == GameStates.StartRoundState)
-            {
-                this.cardsLeft = this.InitializeCardsLeft();
-            }
-
-            if (context.FirstPlayerAnnounce != Announce.None)
+           if (context.FirstPlayerAnnounce != Announce.None)
             {
                 //// If enemy has announce, add other card from announce to enemy card collection.
                 CardType otherTypeFromAnnounce = context.FirstPlayedCard.Type == CardType.King ? CardType.Queen : CardType.King;
@@ -78,7 +73,7 @@
             {
                 var card = this.PlayerActionValidator
                     .GetPossibleCardsToPlay(context, this.Cards)
-                    .OrderByDescending(c => c.GetValue())
+                    .OrderBy(c => c.GetValue())
                     .FirstOrDefault(c => c.Suit != context.TrumpCard.Suit);
 
                 if (card == null)
@@ -107,9 +102,14 @@
                 this.enemyCards.Remove(context.SecondPlayedCard);
             }
 
-            if (context.FirstPlayedCard != null && context.SecondPlayedCard != null)
+            // If round ends with 20 or 40 announce one of the players could have not played a card
+            if (context.FirstPlayedCard != null)
             {
                 this.allCards[context.FirstPlayedCard.Suit][context.FirstPlayedCard.Type] = CardStatus.Passed;
+            }
+
+            if (context.SecondPlayedCard != null)
+            {
                 this.allCards[context.SecondPlayedCard.Suit][context.SecondPlayedCard.Type] = CardStatus.Passed;
             }
 
@@ -119,6 +119,7 @@
         public override void StartRound(ICollection<Card> cards, Card trumpCard, int myTotalPoints, int opponentTotalPoints)
         {
             base.StartRound(cards, trumpCard, myTotalPoints, opponentTotalPoints);
+            this.InitializeCards(this.allCards, this.Cards, this.cardSuits, this.cardTypes);
         }
 
         public override void AddCard(Card card)
@@ -131,7 +132,7 @@
 
         public override void EndRound()
         {
-            this.passedCards.Clear();
+            //this.passedCards.Clear();
             this.enemyCards.Clear();
             base.EndRound();
         }
@@ -153,7 +154,15 @@
                 Card smallestCard = this.Cards
                     .Where(c => c.Suit != context.TrumpCard.Suit && c.Type != CardType.King && c.Type != CardType.Queen)
                     .OrderBy(c => c.GetValue())
-                    .First();
+                    .FirstOrDefault();
+
+                if (smallestCard == null)
+                {
+                    smallestCard =
+                        this.Cards.Where(c => c.Suit != context.TrumpCard.Suit)
+                            .OrderBy(c => c.GetValue())
+                            .FirstOrDefault();
+                }
 
                 return this.PlayCard(smallestCard);
             }
@@ -240,17 +249,16 @@
                         case CardType.Jack:
                             return this.PlayCard(card);
 
-                        case CardType.Ten:
-                            {
-                                if (this.allCards[card.Suit][CardType.Ace] == CardStatus.Passed ||
-                                 this.allCards[card.Suit][CardType.Ace] == CardStatus.InStalker)
-                                {
-                                    return this.PlayCard(card);
-                                }
+                        // case CardType.Ten:
+                        //    {
+                        //        if (this.allCards[card.Suit][CardType.Ace] == CardStatus.Passed ||
+                        //         this.allCards[card.Suit][CardType.Ace] == CardStatus.InStalker)
+                        //        {
+                        //            return this.PlayCard(card);
+                        //        }
 
-                                break;
-                            }
-
+                        // break;
+                        // }
                         case CardType.Queen:
                             {
                                 if (!this.IsCardWaitsForAnnounce(card))
@@ -281,7 +289,6 @@
                 cardToPlay = possibleCardsToPlay.First(c => c.Suit != context.TrumpCard.Suit);
             }*/
 
-            this.lastPlayerCardFromUs = cardToPlay;
             return this.PlayCard(cardToPlay);
         }
 
@@ -379,6 +386,7 @@
             return result;
         }
 
+        // TODO: Refactor in one method
         private bool EnemyContainsLowerCardThan(Card card)
         {
             return this.allCards[card.Suit].Any(c => c.Value == CardStatus.InEnemy && new Card(card.Suit, c.Key).GetValue() < card.GetValue());
@@ -472,16 +480,11 @@
             }
         }
 
-        private IList<Card> InitializeCardsLeft()
+        private void InitializeCards(IDictionary<CardSuit, Dictionary<CardType, CardStatus>> allCardsToInitialize, ICollection<Card> cards, CardSuit[] allCardSuits, CardType[] allCardTypes)
         {
-            foreach (Card card in this.Cards)
+            foreach (Card card in cards)
             {
-                this.allCards[card.Suit][card.Type] = CardStatus.InStalker;
-
-                if (this.cardsLeft.Contains(card))
-                {
-                    this.cardsLeft.Remove(card);
-                }
+                allCardsToInitialize[card.Suit][card.Type] = CardStatus.InStalker;
             }
 
             var result = new List<Card>();
@@ -489,36 +492,34 @@
             // CardType[] cardTypes = new[] { CardType.Ace, CardType.Ten, CardType.King, CardType.Queen, CardType.Jack, CardType.Nine };
             for (int i = 0; i < this.cardSuits.Length; i++)
             {
-                for (int j = 0; j < this.cardTypes.Length; j++)
+                for (int j = 0; j < allCardTypes.Length; j++)
                 {
-                    if (!this.Cards.Contains(new Card(this.cardSuits[i], this.cardTypes[j])))
+                    if (!this.Cards.Contains(new Card(allCardSuits[i], allCardTypes[j])))
                     {
-                        result.Add(new Card(this.cardSuits[i], this.cardTypes[j]));
+                        result.Add(new Card(allCardSuits[i], allCardTypes[j]));
 
-                        if (!this.allCards[this.cardSuits[i]].ContainsKey(this.cardTypes[j]))
+                        if (!this.allCards[allCardSuits[i]].ContainsKey(allCardTypes[j]))
                         {
-                            this.allCards[this.cardSuits[i]].Add(this.cardTypes[j], CardStatus.InDeckOrEnemy);
+                            this.allCards[allCardSuits[i]].Add(allCardTypes[j], CardStatus.InDeckOrEnemy);
                         }
                         else
                         {
-                            this.allCards[this.cardSuits[i]][this.cardTypes[j]] = CardStatus.InDeckOrEnemy;
+                            this.allCards[allCardSuits[i]][allCardTypes[j]] = CardStatus.InDeckOrEnemy;
                         }
                     }
                     else
                     {
-                        if (!this.allCards[this.cardSuits[i]].ContainsKey(this.cardTypes[j]))
+                        if (!this.allCards[allCardSuits[i]].ContainsKey(allCardTypes[j]))
                         {
-                            this.allCards[this.cardSuits[i]].Add(this.cardTypes[j], CardStatus.InStalker);
+                            this.allCards[allCardSuits[i]].Add(allCardTypes[j], CardStatus.InStalker);
                         }
                         else
                         {
-                            this.allCards[this.cardSuits[i]][this.cardTypes[j]] = CardStatus.InStalker;
+                            this.allCards[allCardSuits[i]][allCardTypes[j]] = CardStatus.InStalker;
                         }
                     }
                 }
             }
-
-            return result;
         }
     }
 }
