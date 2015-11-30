@@ -90,26 +90,28 @@
                     // TODO: Refactor this to achieve HQC
                     var higherCard =
                         possibleCards.Where(c => c.Suit == enemyCard.Suit).OrderBy(c => c.GetValue()).LastOrDefault();
-                           
+
                     return this.PlayCard(higherCard);
                 }
 
                 Card card;
                 card = possibleCards.Where(c => c.Suit != trumpSuit).OrderBy(c => c.GetValue()).FirstOrDefault();
-                if (context.State.ShouldObserveRules)
-                {
-                    card = this.ChooseCardToPlay(this.allCards, context, possibleCards);
-                }
+                //if (context.State.ShouldObserveRules)
+                //{
+                //    card = this.ChooseCardToPlay(this.allCards, context, possibleCards);
+                //}
+
+                //card = this.ChooseCardToPlay(this.allCards, context, possibleCards);
 
                 //var card = this.PlayerActionValidator
                 //    .GetPossibleCardsToPlay(context, this.Cards)
                 //    .OrderBy(c => c.GetValue())
                 //    .FirstOrDefault(c => c.Suit != context.TrumpCard.Suit);
 
-                //if (card == null)
-                //{
-                //    card = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards).FirstOrDefault();
-                //}
+                if (card == null)
+                {
+                    card = possibleCards.FirstOrDefault();
+                }
 
                 return this.PlayCard(card);
             }
@@ -170,7 +172,7 @@
         private PlayerAction SelectBestCardWhenShouldPlayFirst(PlayerTurnContext context)
         {
             string currentGameState = context.State.GetType().Name;
-
+            var possibleCards = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards);
             Card cardToPlay = this.CheckForAnounce(context.TrumpCard.Suit, context.CardsLeftInDeck, currentGameState);
 
             if (cardToPlay != null)
@@ -178,21 +180,25 @@
                 return this.PlayCard(cardToPlay);
             }
 
+            //return this.PlayCard(this.ChooseCardToPlay(this.allCards, context, possibleCards));
+
             if (currentGameState == GameStates.StartRoundState)
             {
                 //// possible null value;
-                Card smallestCard = this.Cards
-                    .Where(c => c.Suit != context.TrumpCard.Suit && c.Type != CardType.King && c.Type != CardType.Queen)
-                    .OrderBy(c => c.GetValue())
-                    .FirstOrDefault();
+                //Card smallestCard = this.Cards
+                //    .Where(c => c.Suit != context.TrumpCard.Suit && c.Type != CardType.King && c.Type != CardType.Queen)
+                //    .OrderBy(c => c.GetValue())
+                //    .FirstOrDefault();
 
-                if (smallestCard == null)
-                {
-                    smallestCard =
-                        this.Cards.Where(c => c.Suit != context.TrumpCard.Suit)
-                            .OrderBy(c => c.GetValue())
-                            .FirstOrDefault();
-                }
+                //if (smallestCard == null)
+                //{
+                //    smallestCard =
+                //        this.Cards.Where(c => c.Suit != context.TrumpCard.Suit)
+                //            .OrderBy(c => c.GetValue())
+                //            .FirstOrDefault();
+                //}
+
+                var smallestCard = this.ChooseCardToPlay(this.allCards, context, possibleCards);
 
                 return this.PlayCard(smallestCard);
             }
@@ -212,6 +218,8 @@
                 if (cardThatEnemyHasNotAsSuit == null)
                 {
                     cardThatEnemyHasNotAsSuit = cardsByPower.LastOrDefault();
+                    //cardThatEnemyHasNotAsSuit = this.ChooseCardToPlay(this.allCards, context, possibleCards);
+
                 }
 
                 return this.PlayCard(cardThatEnemyHasNotAsSuit);
@@ -248,40 +256,42 @@
                     return this.CloseGame();
                 }
 
-                IEnumerable<Card> nonTrumpCards = this.Cards.Where(c => c.Suit != context.TrumpCard.Suit).OrderBy(c => c.GetValue());
-                foreach (var card in nonTrumpCards)
-                {
-                    switch (card.Type)
-                    {
-                        case CardType.Nine:
-                            return this.PlayCard(card);
+                //IEnumerable<Card> nonTrumpCards = this.Cards.Where(c => c.Suit != context.TrumpCard.Suit).OrderBy(c => c.GetValue());
+                //foreach (var card in nonTrumpCards)
+                //{
+                //    switch (card.Type)
+                //    {
+                //        case CardType.Nine:
+                //            return this.PlayCard(card);
 
-                        case CardType.Jack:
-                            return this.PlayCard(card);
+                //        case CardType.Jack:
+                //            return this.PlayCard(card);
 
-                        case CardType.Queen:
-                            {
-                                if (!this.IsCardWaitsForAnnounce(card))
-                                {
-                                    return this.PlayCard(card);
-                                }
+                //        case CardType.Queen:
+                //            {
+                //                if (!this.IsCardWaitsForAnnounce(card))
+                //                {
+                //                    return this.PlayCard(card);
+                //                }
 
-                                break;
-                            }
+                //                break;
+                //            }
 
-                        case CardType.King:
-                            {
-                                if (!this.IsCardWaitsForAnnounce(card))
-                                {
-                                    return this.PlayCard(card);
-                                }
+                //        case CardType.King:
+                //            {
+                //                if (!this.IsCardWaitsForAnnounce(card))
+                //                {
+                //                    return this.PlayCard(card);
+                //                }
 
-                                break;
-                            }
-                    }
-                }
+                //                break;
+                //            }
+                //    }
+                //}
 
-                cardToPlay = nonTrumpCards.FirstOrDefault();
+                //cardToPlay = nonTrumpCards.FirstOrDefault();
+
+                cardToPlay = this.ChooseCardToPlay(this.allCards, context, possibleCards);
             }
 
             /*if (cardToPlay == null)
@@ -329,9 +339,14 @@
         {
             //// When we have A and 10 from trumps; necessary points && some other winning cards
             //// In the current context we are first player.
-            bool hasNecessaryTrumps = this.allCards[context.TrumpCard.Suit][CardType.Ten] == CardStatus.InStalker &&
+            bool hasHighTrumps = this.allCards[context.TrumpCard.Suit][CardType.Ace] == CardStatus.InStalker &&
                                       this.allCards[context.TrumpCard.Suit][CardType.Ten] == CardStatus.InStalker;
-            bool hasNecessaryPoints = this.Cards.Sum(c => c.GetValue()) + context.FirstPlayerRoundPoints > 60;
+            bool has40 = this.allCards[context.TrumpCard.Suit][CardType.King] == CardStatus.InStalker
+                         && this.allCards[context.TrumpCard.Suit][CardType.Queen] == CardStatus.InStalker;
+
+            bool hasEnoughAfterAnounce = context.FirstPlayerRoundPoints > 25;
+
+            bool hasNecessaryPoints = this.Cards.Sum(c => c.GetValue()) + context.FirstPlayerRoundPoints > 70;
 
             int sureWiningCards = 0;
             foreach (var card in this.Cards)
@@ -342,7 +357,12 @@
                 }
             }
 
-            if (hasNecessaryTrumps && hasNecessaryPoints && sureWiningCards > 1)
+            if (has40 && hasEnoughAfterAnounce)
+            {
+                return true;
+            }
+
+            if (hasHighTrumps && hasNecessaryPoints && sureWiningCards > 0)
             {
                 return true;
             }
@@ -354,7 +374,7 @@
         {
             if (!enemyHasATrumpCard)
             {
-                //// if enemy has not trumps and we have a trump, should throw a trump;
+                //// In case enemy does not have any trump cards and we have a trump, should throw a trump;
                 IEnumerable<Card> myTrumpCards = this.Cards.Where(c => c.Suit == trumpSuit);
                 if (myTrumpCards.Count() > 0)
                 {
@@ -609,7 +629,7 @@
                 int suit = (int)card.Suit;
                 availableSuits[suit]++;
             }
-            
+
             for (int i = 0; i < suitsPriorities.Length; i++)
             {
                 if ((int)trumpSuit == i || availableSuits[i] == 0)
@@ -628,9 +648,14 @@
             var cardsFromBestSuit = stalkerCards.Where(card => card.Suit == (CardSuit)highestPrioritySuit).OrderBy(this.GetCardPriority).ToList();
             var cardsFromTrump = stalkerCards.Where(card => card.Suit == trumpSuit).OrderBy(this.GetCardPriority).ToList();
 
+            if (!context.State.ShouldObserveRules)
+            {
+                // Take all nontrump cards without Queen and King waiting for announce
+                cardsFromBestSuit = stalkerCards.Where(c => c.Suit != trumpSuit && !(this.GetCardPriority(c) == 1 && this.IsCardWaitsForAnnounce(c))).OrderBy(this.GetCardPriority).ToList();
+            }
 
             // Sort cards by its priority
-            var cardsToChooseFrom  = new List<Card>();
+            var cardsToChooseFrom = new List<Card>();
             if (cardsFromBestSuit.Count != 0)
             {
                 cardsToChooseFrom = cardsFromBestSuit;
@@ -640,8 +665,19 @@
                 cardsToChooseFrom = cardsFromTrump;
             }
 
-            // THIS NUMBER WILL AFFECT THE DECISION OF THE STALKER
-            if (priorityValue < 1)
+            if (!context.State.ShouldObserveRules)
+            {
+                // THIS NUMBER WILL AFFECT THE DECISION OF THE STALKER WHEN IN OPEN STATE
+                if (priorityValue > 5)
+                {
+                    return cardsToChooseFrom.LastOrDefault();
+                }
+
+                return cardsToChooseFrom.FirstOrDefault();
+            }
+
+            // THIS NUMBER WILL AFFECT THE DECISION OF THE STALKER WHEN IN CLOSED STATE
+            if (priorityValue < -1)
             {
                 return cardsToChooseFrom.LastOrDefault();
             }
