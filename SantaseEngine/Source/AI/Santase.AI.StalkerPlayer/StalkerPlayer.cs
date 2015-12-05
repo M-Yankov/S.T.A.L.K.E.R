@@ -32,7 +32,7 @@
         {
             var currentGameState = context.State.GetType().Name;
 
-            // If enemy has announce, add other stalkerHelper from announce to enemy stalkerHelper collection.
+            // If enemy has announce, add other card from announce to enemy card collection.
             if (context.FirstPlayerAnnounce != Announce.None)
             {
                 var otherTypeFromAnnounce = context.FirstPlayedCard.Type == CardType.King ? CardType.Queen : CardType.King;
@@ -52,7 +52,7 @@
                 }
             }
 
-            // Try to change to exchange the bottom trump stalkerHelper from the deck.
+            // Try to change to exchange the bottom trump card from the deck.
             if (this.PlayerActionValidator.IsValid(PlayerAction.ChangeTrump(), context, this.Cards))
             {
                 return this.ChangeTrump(context.TrumpCard);
@@ -79,7 +79,7 @@
                 this.cardHolder.EnemyCards.Remove(context.SecondPlayedCard);
             }
 
-            // If round ends with 20 or 40 announce one of the players could have not played a stalkerHelper
+            // If round ends with 20 or 40 announce one of the players could have not played a card.
             if (context.FirstPlayedCard != null)
             {
                 this.cardHolder.AllCards[context.FirstPlayedCard.Suit][context.FirstPlayedCard.Type] = CardStatus.Passed;
@@ -103,7 +103,7 @@
         {
             this.cardHolder.AllCards[card.Suit][card.Type] = CardStatus.InStalker;
 
-            //// Something strange happens here. When program stops here the Stalker player still have 5 cards, but UI player already played a stalkerHelper on the context.
+            //// Something strange happens here. When program stops here the Stalker player still have 5 cards, but UI player already played a card on the context.
             base.AddCard(card);
         }
 
@@ -113,12 +113,12 @@
             base.EndRound();
         }
 
-        // TODO: Refactor to return stalkerHelper not PlayerAction
         private Card GetBestCardToPlayFirst(PlayerTurnContext context)
         {
             var currentGameState = context.State.GetType().Name;
             var possibleCards = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards);
             var cardToPlay = this.stalkerHelper.CheckForAnounce(context.TrumpCard.Suit, context.CardsLeftInDeck, currentGameState, this.Cards);
+            var cardsByPower = this.Cards.OrderByDescending(c => c.GetValue());
 
             if (cardToPlay != null)
             {
@@ -127,13 +127,13 @@
 
             if (currentGameState == GameStates.StartRoundState)
             {
-                var smallestCard = this.cardChooser.ChooseCardToPlay(context, possibleCards);
+                cardToPlay = this.cardChooser.ChooseCardToPlay(context, possibleCards);
 
-                return smallestCard;
+                return cardToPlay;
             }
-            else if (currentGameState == GameStates.FinalRoundState && context.CardsLeftInDeck == 0)
+
+            if (currentGameState == GameStates.FinalRoundState && context.CardsLeftInDeck == 0)
             {
-                var cardsByPower = this.Cards.OrderByDescending(c => c.GetValue());
                 foreach (var card in cardsByPower)
                 {
                     if (this.stalkerHelper.ContainsLowerCardThan(card, CardStatus.InEnemy) &&
@@ -143,27 +143,26 @@
                     }
                 }
 
-                bool enemyHasTrump = this.cardHolder.EnemyCards.Any(c => c.Suit == context.TrumpCard.Suit);
-                Card cardThatEnemyHasNotAsSuit = this.stalkerHelper.GetCardWithSuitThatEnemyHasNot(enemyHasTrump, context.TrumpCard.Suit, this.Cards);
+                var enemyHasTrump = this.cardHolder.EnemyCards.Any(c => c.Suit == context.TrumpCard.Suit);
+                var cardThatEnemyHasNotAsSuit = this.stalkerHelper.GetCardWithSuitThatEnemyDoesNotHave(enemyHasTrump, context.TrumpCard.Suit, this.Cards);
                 if (cardThatEnemyHasNotAsSuit == null)
                 {
                     cardThatEnemyHasNotAsSuit = cardsByPower.LastOrDefault();
-                    //// cardThatEnemyHasNotAsSuit = this.ChooseCardToPlay(this.allCards, context, possibleCards);
                 }
 
                 return cardThatEnemyHasNotAsSuit;
             }
-            else if (currentGameState == GameStates.FinalRoundState)
+
+            if (currentGameState == GameStates.FinalRoundState)
             {
-                IEnumerable<Card> orderedByPower = this.Cards.OrderByDescending(c => c.GetValue());
-                Card trump = orderedByPower.FirstOrDefault(c => c.Suit == context.TrumpCard.Suit);
+                var trump = cardsByPower.FirstOrDefault(c => c.Suit == context.TrumpCard.Suit);
 
                 if (trump != null && !this.stalkerHelper.ContainsGreaterCardThan(trump, CardStatus.InDeckOrEnemy))
                 {
                     return trump;
                 }
 
-                foreach (var card in orderedByPower)
+                foreach (var card in cardsByPower)
                 {
                     if (this.stalkerHelper.ContainsLowerCardThan(card, CardStatus.InDeckOrEnemy))
                     {
@@ -171,15 +170,13 @@
                     }
                 }
 
-                cardToPlay = orderedByPower.Last();
+                cardToPlay = cardsByPower.Last();
             }
             else if (currentGameState == GameStates.TwoCardsLeftRoundState)
             {
                 cardToPlay =
                     this.Cards.Where(c => c.Suit != context.TrumpCard.Suit).OrderBy(c => c.GetValue()).FirstOrDefault();
             }
-
-            // TODO: Extract game closing to other method
             else if (currentGameState == GameStates.MoreThanTwoCardsLeftRoundState)
             {
                 cardToPlay = this.cardChooser.ChooseCardToPlay(context, possibleCards);
@@ -195,28 +192,26 @@
             var possibleCards = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards);
             var trumpSuit = context.TrumpCard.Suit;
 
-            // Use trump to take the enemy stalkerHelper in case it is with higher value
-            if (enemyCardPriority == 2 && enemyCard.Suit != trumpSuit && possibleCards.Any(c => c.Suit == trumpSuit))
+            // Use trump to take the enemy card in case it is with higher value
+            if ((enemyCardPriority == 2) && enemyCard.Suit != trumpSuit && possibleCards.Any(c => c.Suit == trumpSuit))
             {
-                // TODO: Change the trump stalkerHelper used to take enemy stalkerHelper
                 var trump =
                    possibleCards.Where(c => c.Suit == context.TrumpCard.Suit)
                         .OrderBy(this.stalkerHelper.GetCardPriority)
-                        .FirstOrDefault();
+                         .LastOrDefault();
                 return trump;
             }
 
-            // Try to take the played enemy stalkerHelper.
+            // Try to take the played enemy card.
             if (possibleCards.Any(c => c.Suit == enemyCard.Suit && c.GetValue() > enemyCard.GetValue()))
             {
-                // TODO: Do not take weak cards
                 var higherCard =
                     possibleCards.Where(c => c.Suit == enemyCard.Suit).OrderBy(c => c.GetValue()).LastOrDefault();
 
                 return higherCard;
             }
 
-            // Else play the weakest stalkerHelper which is not trump.
+            // Else play the weakest card which is not trump.
             var card = possibleCards.Where(c => c.Suit != trumpSuit).OrderBy(c => c.GetValue()).FirstOrDefault()
                        ?? possibleCards.OrderBy(c => c.GetValue()).FirstOrDefault();
 
