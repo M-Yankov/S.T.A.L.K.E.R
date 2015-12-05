@@ -11,7 +11,7 @@
 
         bool CanCloseTheGame(PlayerTurnContext context, ICollection<Card> playerCards);
 
-        Card GetCardWithSuitThatEnemyHasNot(bool enemyHasATrumpCard, CardSuit trumpSuit, ICollection<Card> playerCards);
+        Card GetCardWithSuitThatEnemyDoesNotHave(bool enemyHasATrumpCard, CardSuit trumpSuit, ICollection<Card> playerCards);
 
         Card CheckForAnounce(CardSuit trumpSuit, int cardsLeftInDeck, string state, ICollection<Card> playerCards);
 
