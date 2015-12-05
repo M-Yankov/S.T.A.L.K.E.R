@@ -40,14 +40,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CardHelpers\CardChooser.cs" />
-    <Compile Include="CardHelpers\HelperExtensions.cs" />
-    <Compile Include="CardHelpers\CardHelper.cs" />
+    <Compile Include="CardHelpers\StalkerHelper.cs" />
     <Compile Include="CardHelpers\CardHolder.cs" />
     <Compile Include="Common\CardStatus.cs" />
     <Compile Include="Common\Constants\GameStates.cs" />
     <Compile Include="Contracts\ICardChooser.cs" />
-    <Compile Include="Contracts\IHelperExtensions.cs" />
-    <Compile Include="Contracts\ICardHelper.cs" />
+    <Compile Include="Contracts\IStalkerHelper.cs" />
     <Compile Include="Contracts\ICardHolder.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="StalkerPlayer.cs" />

@@ -5,8 +5,10 @@
     using Logic.Cards;
     using Logic.Players;
 
-    public interface IHelperExtensions
+    public interface IStalkerHelper
     {
+        int GetCardPriority(Card card);
+
         bool CanCloseTheGame(PlayerTurnContext context, ICollection<Card> playerCards);
 
         Card GetCardWithSuitThatEnemyHasNot(bool enemyHasATrumpCard, CardSuit trumpSuit, ICollection<Card> playerCards);

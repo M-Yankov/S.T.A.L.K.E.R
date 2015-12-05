@@ -8,25 +8,33 @@
     using Logic.Cards;
     using Logic.Players;
 
-    public class HelperExtensions : IHelperExtensions
+    public class StalkerHelper : IStalkerHelper
     {
-        private ICardHolder cardHolder;
+        private readonly ICardHolder cardHolder;
 
-        public HelperExtensions(ICardHolder holder)
+        public StalkerHelper(ICardHolder holder)
         {
             this.cardHolder = holder;
         }
 
-        public ICardHolder CardHolder
+        public int GetCardPriority(Card card)
         {
-            get
+            switch (card.Type)
             {
-                return this.cardHolder;
-            }
-
-            private set
-            {
-                this.cardHolder = value;
+                case CardType.Nine:
+                    return 0;
+                case CardType.Jack:
+                    return 0;
+                case CardType.Queen:
+                    return 1;
+                case CardType.King:
+                    return 1;
+                case CardType.Ace:
+                    return 2;
+                case CardType.Ten:
+                    return 2;
+                default:
+                    return 0;
             }
         }
 

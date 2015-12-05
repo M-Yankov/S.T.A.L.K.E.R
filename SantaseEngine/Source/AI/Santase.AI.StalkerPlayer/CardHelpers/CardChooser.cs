@@ -12,12 +12,12 @@
     {
         private readonly ICardHolder cardHolder;
 
-        private readonly ICardHelper cardHelper;
+        private readonly IStalkerHelper stalkerHelper;
 
-        public CardChooser(ICardHolder cardHolder, ICardHelper cardHelper)
+        public CardChooser(ICardHolder cardHolder, IStalkerHelper stalkerHelper)
         {
             this.cardHolder = cardHolder;
-            this.cardHelper = cardHelper;
+            this.stalkerHelper = stalkerHelper;
         }
 
         public Card ChooseCardToPlay(PlayerTurnContext context, ICollection<Card> stalkerCards)
@@ -52,13 +52,13 @@
             }
 
             // Select the cards from the best suit
-            var cardsFromBestSuit = stalkerCards.Where(card => card.Suit == (CardSuit)highestPrioritySuit).OrderBy(this.cardHelper.GetCardPriority).ToList();
-            var cardsFromTrump = stalkerCards.Where(card => card.Suit == trumpSuit).OrderBy(this.cardHelper.GetCardPriority).ToList();
+            var cardsFromBestSuit = stalkerCards.Where(card => card.Suit == (CardSuit)highestPrioritySuit).OrderBy(this.stalkerHelper.GetCardPriority).ToList();
+            var cardsFromTrump = stalkerCards.Where(card => card.Suit == trumpSuit).OrderBy(this.stalkerHelper.GetCardPriority).ToList();
 
             if (!context.State.ShouldObserveRules)
             {
                 // Take all nontrump cards without Queen and King waiting for announce
-                cardsFromBestSuit = stalkerCards.Where(c => c.Suit != trumpSuit && !(this.cardHelper.GetCardPriority(c) == 1 && this.IsCardWaitingForAnnounce(c))).OrderBy(this.cardHelper.GetCardPriority).ToList();
+                cardsFromBestSuit = stalkerCards.Where(c => c.Suit != trumpSuit && !(this.stalkerHelper.GetCardPriority(c) == 1 && this.IsCardWaitingForAnnounce(c))).OrderBy(this.stalkerHelper.GetCardPriority).ToList();
             }
 
             // Sort cards by its priority
