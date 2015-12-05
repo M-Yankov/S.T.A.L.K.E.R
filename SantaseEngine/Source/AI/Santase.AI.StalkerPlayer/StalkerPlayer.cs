@@ -1,11 +1,9 @@
 ﻿namespace Santase.AI.StalkerPlayer
 {
-    using System;
     using System.Collections.Generic;
     using System.Linq;
     using Logic;
     using Logic.Cards;
-    using Logic.Extensions;
     using Logic.Players;
 
     using Santase.AI.StalkerPlayer.CardHelpers;
@@ -39,13 +37,14 @@
             if (context.FirstPlayerAnnounce != Announce.None)
             {
                 //// If enemy has announce, add other card from announce to enemy card collection.
-                CardType otherTypeFromAnnounce = context.FirstPlayedCard.Type == CardType.King ? CardType.Queen : CardType.King;
+                var otherTypeFromAnnounce = context.FirstPlayedCard.Type == CardType.King ? CardType.Queen : CardType.King;
                 var otherCardFromAnnounce = new Card(context.FirstPlayedCard.Suit, otherTypeFromAnnounce);
 
                 this.cardHolder.EnemyCards.Add(otherCardFromAnnounce);
                 this.cardHolder.AllCards[otherCardFromAnnounce.Suit][otherCardFromAnnounce.Type] = CardStatus.InEnemy;
             }
 
+            // If in final state refresh enemy cards
             if (currentGameState == GameStates.FinalRoundState && context.CardsLeftInDeck == 0 && this.Cards.Count == 6)
             {
                 this.cardHolder.RefreshEnemyCards();
@@ -53,14 +52,9 @@
                 {
                     this.cardHolder.EnemyCards.Remove(context.FirstPlayedCard);
                 }
-
-                /*this.enemyCards = new HashSet<Card>(this.cardsLeft);
-                if (context.FirstPlayedCard != null)
-                {
-                    this.enemyCards.Remove(context.FirstPlayedCard);
-                }*/
             }
 
+            // Try to change to exchange the bottom trump card from the deck
             if (this.PlayerActionValidator.IsValid(PlayerAction.ChangeTrump(), context, this.Cards))
             {
                 return this.ChangeTrump(context.TrumpCard);
@@ -71,17 +65,18 @@
                 return this.PlayCard(this.Cards.First());
             }
 
-            ////TODO: Improve response
+            // TODO: Improve response
             if (context.FirstPlayedCard != null)
             {
                 var enemyCard = context.FirstPlayedCard;
                 var enemyCardPriority = this.cardChooser.GetCardPriority(enemyCard);
                 var possibleCards = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards);
                 var trumpSuit = context.TrumpCard.Suit;
-                // Use trump to take high card
+
+                // Use trump to take the enemy card in case it is with higher value
                 if (enemyCardPriority == 2 && enemyCard.Suit != trumpSuit && possibleCards.Any(c => c.Suit == trumpSuit))
                 {
-                    // TODO: Refactor this to achieve HQC
+                    // TODO: Change the trump card used to take enemy card
                     var trump =
                        possibleCards.Where(c => c.Suit == context.TrumpCard.Suit)
                             .OrderBy(this.cardChooser.GetCardPriority)
@@ -89,38 +84,24 @@
                     return this.PlayCard(trump);
                 }
 
+                // Try to take the played enemy card.
                 if (possibleCards.Any(c => c.Suit == enemyCard.Suit && c.GetValue() > enemyCard.GetValue()))
                 {
-                    // TODO: Refactor this to achieve HQC
+                    // TODO: Do not take weak cards
                     var higherCard =
                         possibleCards.Where(c => c.Suit == enemyCard.Suit).OrderBy(c => c.GetValue()).LastOrDefault();
 
                     return this.PlayCard(higherCard);
                 }
 
-                var card = possibleCards.Where(c => c.Suit != trumpSuit).OrderBy(c => c.GetValue()).FirstOrDefault();
-                //if (context.State.ShouldObserveRules)
-                //{
-                //    card = this.ChooseCardToPlay(this.allCards, context, possibleCards);
-                //}
-
-                //card = this.ChooseCardToPlay(this.allCards, context, possibleCards);
-
-                //var card = this.PlayerActionValidator
-                //    .GetPossibleCardsToPlay(context, this.Cards)
-                //    .OrderBy(c => c.GetValue())
-                //    .FirstOrDefault(c => c.Suit != context.TrumpCard.Suit);
-
-                if (card == null)
-                {
-                    card = possibleCards.OrderBy(c => c.GetValue()).FirstOrDefault();
-                }
+                // Else play the weakest card which is not trump.
+                var card = possibleCards.Where(c => c.Suit != trumpSuit).OrderBy(c => c.GetValue()).FirstOrDefault()
+                           ?? possibleCards.OrderBy(c => c.GetValue()).FirstOrDefault();
 
                 return this.PlayCard(card);
             }
 
-            PlayerAction action = this.SelectBestCardWhenShouldPlayFirst(context);
-            return action;
+            return this.SelectBestCardWhenShouldPlayFirst(context);
         }
 
         public override void EndTurn(PlayerTurnContext context)
@@ -165,6 +146,7 @@
             base.EndRound();
         }
 
+        // TODO: Refactor to return card not PlayerAction
         private PlayerAction SelectBestCardWhenShouldPlayFirst(PlayerTurnContext context)
         {
             var currentGameState = context.State.GetType().Name;
@@ -228,6 +210,8 @@
                 cardToPlay =
                     this.Cards.Where(c => c.Suit != context.TrumpCard.Suit).OrderBy(c => c.GetValue()).FirstOrDefault();
             }
+
+            // TODO: Extract game closing to other method
             else if (currentGameState == GameStates.MoreThanTwoCardsLeftRoundState)
             {
                 if (this.CanCloseTheGame(context) && context.State.CanClose)
@@ -245,35 +229,23 @@
         {
             //// When we have A and 10 from trumps; necessary points && some other winning cards
             //// In the current context we are first player.
-            bool hasHighTrumps = this.cardHolder.AllCards[context.TrumpCard.Suit][CardType.Ace] == CardStatus.InStalker &&
+            var hasHighTrumps = this.cardHolder.AllCards[context.TrumpCard.Suit][CardType.Ace] == CardStatus.InStalker &&
                                       this.cardHolder.AllCards[context.TrumpCard.Suit][CardType.Ten] == CardStatus.InStalker;
-            bool has40 = this.cardHolder.AllCards[context.TrumpCard.Suit][CardType.King] == CardStatus.InStalker
+            var has40 = this.cardHolder.AllCards[context.TrumpCard.Suit][CardType.King] == CardStatus.InStalker
                          && this.cardHolder.AllCards[context.TrumpCard.Suit][CardType.Queen] == CardStatus.InStalker;
 
-            bool hasEnoughAfterAnounce = context.FirstPlayerRoundPoints > 25;
+            var hasEnoughAfterAnounce = context.FirstPlayerRoundPoints > 25;
 
-            bool hasNecessaryPoints = this.Cards.Sum(c => c.GetValue()) + context.FirstPlayerRoundPoints > 70;
+            var hasNecessaryPoints = this.Cards.Sum(c => c.GetValue()) + context.FirstPlayerRoundPoints > 70;
 
-            int sureWiningCards = 0;
-            foreach (var card in this.Cards)
-            {
-                if (!this.HasGreatherNonPassedCardThan(card))
-                {
-                    sureWiningCards++;
-                }
-            }
+            var sureWiningCards = this.Cards.Count(card => !this.HasGreatherNonPassedCardThan(card));
 
             if (has40 && hasEnoughAfterAnounce)
             {
                 return true;
             }
 
-            if (hasHighTrumps && hasNecessaryPoints && sureWiningCards > 0)
-            {
-                return true;
-            }
-
-            return false;
+            return hasHighTrumps && hasNecessaryPoints && sureWiningCards > 0;
         }
 
         private Card GetCardWithSuitThatEnemyHasNot(bool enemyHasATrumpCard, CardSuit trumpSuit)
@@ -281,7 +253,7 @@
             if (!enemyHasATrumpCard)
             {
                 //// In case enemy does not have any trump cards and we have a trump, should throw a trump;
-                IEnumerable<Card> myTrumpCards = this.Cards.Where(c => c.Suit == trumpSuit);
+                var myTrumpCards = this.Cards.Where(c => c.Suit == trumpSuit).ToList();
                 if (myTrumpCards.Count() > 0)
                 {
                     return myTrumpCards.OrderBy(c => c.GetValue()).LastOrDefault();
@@ -306,7 +278,6 @@
 
             return null;
         }
-
 
         // TODO: Refactor in one method
         private bool EnemyContainsLowerCardThan(Card card)
@@ -342,7 +313,7 @@
             {
                 if (card.Type == CardType.King || card.Type == CardType.Queen)
                 {
-                    CardType otherTypeForAnnounce = card.Type == CardType.King ? CardType.Queen : CardType.King;
+                    var otherTypeForAnnounce = card.Type == CardType.King ? CardType.Queen : CardType.King;
                     var otherCardForAnnounce = new Card(card.Suit, otherTypeForAnnounce);
 
                     //// instead to search this.Cards.Conatains(otherCardForAnounce);
@@ -377,7 +348,7 @@
             }
             else
             {
-                Card cardToReturn = new Card(announcePairs[0].Suit, announcePairs[0].Type);
+                var cardToReturn = new Card(announcePairs[0].Suit, announcePairs[0].Type);
 
                 //// They will be ordered in this way: [Q♦ K♦; K♠ Q♠; К♣ Q♣] by pairs: two diamonds, two clubs e.t.c. so incrementation will be i+=2
                 for (int i = 0; i < announcePairs.Count; i += 2)

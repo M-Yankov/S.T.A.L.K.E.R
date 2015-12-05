@@ -8,6 +8,6 @@
 
         public int CountFirstPlayedCardIsLow { get; set; }
 
-        public int CountOfFirstPlayedTrumpCardWhenShoudNotObserveRules { get; set; }
+        public int CountOfFirstPlayedTrumpCardWhenShouldNotObserveRules { get; set; }
     }
 }
