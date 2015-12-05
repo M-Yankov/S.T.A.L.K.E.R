@@ -4,6 +4,7 @@
     using System.Linq;
 
     using Santase.AI.StalkerPlayer.Common;
+    using Santase.AI.StalkerPlayer.Common.Constants;
     using Santase.AI.StalkerPlayer.Contracts;
     using Santase.Logic.Cards;
     using Santase.Logic.Players;
@@ -67,11 +68,11 @@
             if (!context.State.ShouldObserveRules)
             {
                 // THIS NUMBER WILL AFFECT THE DECISION OF THE STALKER WHEN IN OPEN STATE
-                return priorityValue > 5 ? cardsToChooseFrom.LastOrDefault() : cardsToChooseFrom.FirstOrDefault();
+                return priorityValue > CardChooserConstants.OpenGamePriority ? cardsToChooseFrom.LastOrDefault() : cardsToChooseFrom.FirstOrDefault();
             }
 
             // THIS NUMBER WILL AFFECT THE DECISION OF THE STALKER WHEN IN CLOSED STATE
-            return priorityValue < -1 ? cardsToChooseFrom.LastOrDefault() : cardsToChooseFrom.FirstOrDefault();
+            return priorityValue < CardChooserConstants.ClosedGamePriority ? cardsToChooseFrom.LastOrDefault() : cardsToChooseFrom.FirstOrDefault();
         }
 
         private bool IsCardWaitingForAnnounce(Card card)
