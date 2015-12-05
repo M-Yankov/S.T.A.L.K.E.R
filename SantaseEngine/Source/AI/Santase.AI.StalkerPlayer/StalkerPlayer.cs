@@ -148,7 +148,7 @@
                 if (cardThatEnemyHasNotAsSuit == null)
                 {
                     cardThatEnemyHasNotAsSuit = cardsByPower.LastOrDefault();
-                    //cardThatEnemyHasNotAsSuit = this.ChooseCardToPlay(this.allCards, context, possibleCards);
+                    //// cardThatEnemyHasNotAsSuit = this.ChooseCardToPlay(this.allCards, context, possibleCards);
                 }
 
                 return cardThatEnemyHasNotAsSuit;
