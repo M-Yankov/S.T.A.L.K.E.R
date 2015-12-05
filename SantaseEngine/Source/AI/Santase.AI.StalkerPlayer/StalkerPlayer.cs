@@ -13,18 +13,17 @@
 
     public class StalkerPlayer : BasePlayer
     {
-        private readonly CardChooser cardChooser;
+        private readonly ICardChooser cardChooser;
 
         private readonly ICardHolder cardHolder;
 
-        private EnemyPlayerStatistics enemyStats;
+        private readonly ICardHelper cardHelper;
 
         public StalkerPlayer()
         {
-            this.enemyStats = new EnemyPlayerStatistics();
-
+            this.cardHelper = new CardHelper();
             this.cardHolder = new CardHolder();
-            this.cardChooser = new CardChooser(this.cardHolder);
+            this.cardChooser = new CardChooser(this.cardHolder, this.cardHelper);
         }
 
         public override string Name => "S.T.A.L.K.E.R";
@@ -74,7 +73,7 @@
         private Card GetBestCardToRespond(PlayerTurnContext context)
         {
             var enemyCard = context.FirstPlayedCard;
-            var enemyCardPriority = this.cardChooser.GetCardPriority(enemyCard);
+            var enemyCardPriority = this.cardHelper.GetCardPriority(enemyCard);
             var possibleCards = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards);
             var trumpSuit = context.TrumpCard.Suit;
 
@@ -84,7 +83,7 @@
                 // TODO: Change the trump card used to take enemy card
                 var trump =
                    possibleCards.Where(c => c.Suit == context.TrumpCard.Suit)
-                        .OrderBy(this.cardChooser.GetCardPriority)
+                        .OrderBy(this.cardHelper.GetCardPriority)
                         .FirstOrDefault();
                 return trump;
             }
@@ -216,7 +215,7 @@
             // TODO: Extract game closing to other method
             else if (currentGameState == GameStates.MoreThanTwoCardsLeftRoundState)
             {
-               cardToPlay = this.cardChooser.ChooseCardToPlay(context, possibleCards);
+                cardToPlay = this.cardChooser.ChooseCardToPlay(context, possibleCards);
             }
 
             return cardToPlay;
@@ -266,10 +265,8 @@
                     {
                         return this.Cards.Where(c => c.Suit == card.Suit).OrderBy(c => c.GetValue()).First();
                     }
-                    else
-                    {
-                        return this.Cards.Where(c => c.Suit == card.Suit).OrderByDescending(c => c.GetValue()).First();
-                    }
+
+                    return this.Cards.Where(c => c.Suit == card.Suit).OrderByDescending(c => c.GetValue()).First();
                 }
             }
 
@@ -313,7 +310,6 @@
                     var otherTypeForAnnounce = card.Type == CardType.King ? CardType.Queen : CardType.King;
                     var otherCardForAnnounce = new Card(card.Suit, otherTypeForAnnounce);
 
-                    //// instead to search this.Cards.Conatains(otherCardForAnounce);
                     if (this.cardHolder.AllCards[card.Suit][otherTypeForAnnounce] == CardStatus.InStalker)
                     {
                         announcePairs.Add(card);

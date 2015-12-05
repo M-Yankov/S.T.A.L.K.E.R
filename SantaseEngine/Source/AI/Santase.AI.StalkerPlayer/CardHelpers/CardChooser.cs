@@ -12,9 +12,12 @@
     {
         private readonly ICardHolder cardHolder;
 
-        public CardChooser(ICardHolder cardHolder)
+        private readonly ICardHelper cardHelper;
+
+        public CardChooser(ICardHolder cardHolder, ICardHelper cardHelper)
         {
             this.cardHolder = cardHolder;
+            this.cardHelper = cardHelper;
         }
 
         public Card ChooseCardToPlay(PlayerTurnContext context, ICollection<Card> stalkerCards)
@@ -49,13 +52,13 @@
             }
 
             // Select the cards from the best suit
-            var cardsFromBestSuit = stalkerCards.Where(card => card.Suit == (CardSuit)highestPrioritySuit).OrderBy(this.GetCardPriority).ToList();
-            var cardsFromTrump = stalkerCards.Where(card => card.Suit == trumpSuit).OrderBy(this.GetCardPriority).ToList();
+            var cardsFromBestSuit = stalkerCards.Where(card => card.Suit == (CardSuit)highestPrioritySuit).OrderBy(this.cardHelper.GetCardPriority).ToList();
+            var cardsFromTrump = stalkerCards.Where(card => card.Suit == trumpSuit).OrderBy(this.cardHelper.GetCardPriority).ToList();
 
             if (!context.State.ShouldObserveRules)
             {
                 // Take all nontrump cards without Queen and King waiting for announce
-                cardsFromBestSuit = stalkerCards.Where(c => c.Suit != trumpSuit && !(this.GetCardPriority(c) == 1 && this.IsCardWaitingForAnnounce(c))).OrderBy(this.GetCardPriority).ToList();
+                cardsFromBestSuit = stalkerCards.Where(c => c.Suit != trumpSuit && !(this.cardHelper.GetCardPriority(c) == 1 && this.IsCardWaitingForAnnounce(c))).OrderBy(this.cardHelper.GetCardPriority).ToList();
             }
 
             // Sort cards by its priority
@@ -69,27 +72,6 @@
 
             // THIS NUMBER WILL AFFECT THE DECISION OF THE STALKER WHEN IN CLOSED STATE
             return priorityValue < -1 ? cardsToChooseFrom.LastOrDefault() : cardsToChooseFrom.FirstOrDefault();
-        }
-
-        public int GetCardPriority(Card card)
-        {
-            switch (card.Type)
-            {
-                case CardType.Nine:
-                    return 0;
-                case CardType.Jack:
-                    return 0;
-                case CardType.Queen:
-                    return 1;
-                case CardType.King:
-                    return 1;
-                case CardType.Ace:
-                    return 2;
-                case CardType.Ten:
-                    return 2;
-                default:
-                    return 0;
-            }
         }
 
         private bool IsCardWaitingForAnnounce(Card card)
