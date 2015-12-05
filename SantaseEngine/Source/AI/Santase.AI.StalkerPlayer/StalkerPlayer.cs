@@ -33,10 +33,9 @@
         {
             var currentGameState = context.State.GetType().Name;
 
-            //// get cards left
+            // If enemy has announce, add other card from announce to enemy card collection.
             if (context.FirstPlayerAnnounce != Announce.None)
             {
-                //// If enemy has announce, add other card from announce to enemy card collection.
                 var otherTypeFromAnnounce = context.FirstPlayedCard.Type == CardType.King ? CardType.Queen : CardType.King;
                 var otherCardFromAnnounce = new Card(context.FirstPlayedCard.Suit, otherTypeFromAnnounce);
 
@@ -54,54 +53,57 @@
                 }
             }
 
-            // Try to change to exchange the bottom trump card from the deck
+            // Try to change to exchange the bottom trump card from the deck.
             if (this.PlayerActionValidator.IsValid(PlayerAction.ChangeTrump(), context, this.Cards))
             {
                 return this.ChangeTrump(context.TrumpCard);
             }
 
-            if (this.Cards.Count == 1)
+            // In case all requirements are met: close the game.
+            if (context.FirstPlayedCard == null &&
+                currentGameState == GameStates.MoreThanTwoCardsLeftRoundState &&
+                context.State.CanClose &&
+                this.CanCloseTheGame(context))
             {
-                return this.PlayCard(this.Cards.First());
+                return this.CloseGame();
             }
 
-            // TODO: Improve response
-            if (context.FirstPlayedCard != null)
+            return this.PlayCard(context.FirstPlayedCard != null ? this.GetBestCardToRespond(context) : this.GetBestCardToPlayFirst(context));
+        }
+
+        private Card GetBestCardToRespond(PlayerTurnContext context)
+        {
+            var enemyCard = context.FirstPlayedCard;
+            var enemyCardPriority = this.cardChooser.GetCardPriority(enemyCard);
+            var possibleCards = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards);
+            var trumpSuit = context.TrumpCard.Suit;
+
+            // Use trump to take the enemy card in case it is with higher value
+            if (enemyCardPriority == 2 && enemyCard.Suit != trumpSuit && possibleCards.Any(c => c.Suit == trumpSuit))
             {
-                var enemyCard = context.FirstPlayedCard;
-                var enemyCardPriority = this.cardChooser.GetCardPriority(enemyCard);
-                var possibleCards = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards);
-                var trumpSuit = context.TrumpCard.Suit;
-
-                // Use trump to take the enemy card in case it is with higher value
-                if (enemyCardPriority == 2 && enemyCard.Suit != trumpSuit && possibleCards.Any(c => c.Suit == trumpSuit))
-                {
-                    // TODO: Change the trump card used to take enemy card
-                    var trump =
-                       possibleCards.Where(c => c.Suit == context.TrumpCard.Suit)
-                            .OrderBy(this.cardChooser.GetCardPriority)
-                            .FirstOrDefault();
-                    return this.PlayCard(trump);
-                }
-
-                // Try to take the played enemy card.
-                if (possibleCards.Any(c => c.Suit == enemyCard.Suit && c.GetValue() > enemyCard.GetValue()))
-                {
-                    // TODO: Do not take weak cards
-                    var higherCard =
-                        possibleCards.Where(c => c.Suit == enemyCard.Suit).OrderBy(c => c.GetValue()).LastOrDefault();
-
-                    return this.PlayCard(higherCard);
-                }
-
-                // Else play the weakest card which is not trump.
-                var card = possibleCards.Where(c => c.Suit != trumpSuit).OrderBy(c => c.GetValue()).FirstOrDefault()
-                           ?? possibleCards.OrderBy(c => c.GetValue()).FirstOrDefault();
-
-                return this.PlayCard(card);
+                // TODO: Change the trump card used to take enemy card
+                var trump =
+                   possibleCards.Where(c => c.Suit == context.TrumpCard.Suit)
+                        .OrderBy(this.cardChooser.GetCardPriority)
+                        .FirstOrDefault();
+                return trump;
             }
 
-            return this.SelectBestCardWhenShouldPlayFirst(context);
+            // Try to take the played enemy card.
+            if (possibleCards.Any(c => c.Suit == enemyCard.Suit && c.GetValue() > enemyCard.GetValue()))
+            {
+                // TODO: Do not take weak cards
+                var higherCard =
+                    possibleCards.Where(c => c.Suit == enemyCard.Suit).OrderBy(c => c.GetValue()).LastOrDefault();
+
+                return higherCard;
+            }
+
+            // Else play the weakest card which is not trump.
+            var card = possibleCards.Where(c => c.Suit != trumpSuit).OrderBy(c => c.GetValue()).FirstOrDefault()
+                       ?? possibleCards.OrderBy(c => c.GetValue()).FirstOrDefault();
+
+            return card;
         }
 
         public override void EndTurn(PlayerTurnContext context)
@@ -147,7 +149,7 @@
         }
 
         // TODO: Refactor to return card not PlayerAction
-        private PlayerAction SelectBestCardWhenShouldPlayFirst(PlayerTurnContext context)
+        private Card GetBestCardToPlayFirst(PlayerTurnContext context)
         {
             var currentGameState = context.State.GetType().Name;
             var possibleCards = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards);
@@ -155,14 +157,14 @@
 
             if (cardToPlay != null)
             {
-                return this.PlayCard(cardToPlay);
+                return cardToPlay;
             }
 
             if (currentGameState == GameStates.StartRoundState)
             {
                 var smallestCard = this.cardChooser.ChooseCardToPlay(context, possibleCards);
 
-                return this.PlayCard(smallestCard);
+                return smallestCard;
             }
             else if (currentGameState == GameStates.FinalRoundState && context.CardsLeftInDeck == 0)
             {
@@ -171,7 +173,7 @@
                 {
                     if (this.EnemyContainsLowerCardThan(card) && !this.EnemyContainsGreaterCardThan(card))
                     {
-                        return this.PlayCard(card);
+                        return card;
                     }
                 }
 
@@ -183,7 +185,7 @@
                     //cardThatEnemyHasNotAsSuit = this.ChooseCardToPlay(this.allCards, context, possibleCards);
                 }
 
-                return this.PlayCard(cardThatEnemyHasNotAsSuit);
+                return cardThatEnemyHasNotAsSuit;
             }
             else if (currentGameState == GameStates.FinalRoundState)
             {
@@ -192,14 +194,14 @@
 
                 if (trump != null && !this.HasGreatherNonPassedCardThan(trump))
                 {
-                    return this.PlayCard(trump);
+                    return trump;
                 }
 
                 foreach (var card in orderedByPower)
                 {
                     if (this.HasSmallerNonPassedCardThan(card))
                     {
-                        return this.PlayCard(card);
+                        return card;
                     }
                 }
 
@@ -214,15 +216,10 @@
             // TODO: Extract game closing to other method
             else if (currentGameState == GameStates.MoreThanTwoCardsLeftRoundState)
             {
-                if (this.CanCloseTheGame(context) && context.State.CanClose)
-                {
-                    return this.CloseGame();
-                }
-
-                cardToPlay = this.cardChooser.ChooseCardToPlay(context, possibleCards);
+               cardToPlay = this.cardChooser.ChooseCardToPlay(context, possibleCards);
             }
 
-            return this.PlayCard(cardToPlay);
+            return cardToPlay;
         }
 
         private bool CanCloseTheGame(PlayerTurnContext context)
