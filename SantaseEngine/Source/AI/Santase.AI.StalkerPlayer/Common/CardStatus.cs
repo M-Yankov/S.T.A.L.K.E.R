@@ -1,4 +1,4 @@
-﻿namespace Santase.AI.StalkerPlayer
+﻿namespace Santase.AI.StalkerPlayer.Common
 {
     public enum CardStatus
     {

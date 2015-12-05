@@ -8,6 +8,10 @@
     using Logic.Extensions;
     using Logic.Players;
 
+    using Santase.AI.StalkerPlayer.CardHelpers;
+    using Santase.AI.StalkerPlayer.Common;
+    using Santase.AI.StalkerPlayer.Common.Constants;
+
     public class StalkerPlayer : BasePlayer
     {
         private readonly CardSuit[] cardSuits = new[] { CardSuit.Club, CardSuit.Diamond, CardSuit.Heart, CardSuit.Spade };
@@ -15,6 +19,7 @@
         private HashSet<Card> enemyCards = new HashSet<Card>();
         private Dictionary<CardSuit, Dictionary<CardType, CardStatus>> allCards;
         private EnemyPlayerStatistics enemyStats;
+        private readonly CardChooser cardChooser;
 
         public StalkerPlayer()
         {
@@ -25,6 +30,8 @@
             this.allCards.Add(CardSuit.Diamond, new Dictionary<CardType, CardStatus>());
             this.allCards.Add(CardSuit.Heart, new Dictionary<CardType, CardStatus>());
             this.allCards.Add(CardSuit.Spade, new Dictionary<CardType, CardStatus>());
+
+            this.cardChooser = new CardChooser(this.allCards);
         }
 
         public override string Name => "S.T.A.L.K.E.R";
@@ -69,7 +76,7 @@
             if (context.FirstPlayedCard != null)
             {
                 var enemyCard = context.FirstPlayedCard;
-                var enemyCardPriority = this.GetCardPriority(enemyCard);
+                var enemyCardPriority = this.cardChooser.GetCardPriority(enemyCard);
                 var possibleCards = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards);
                 var trumpSuit = context.TrumpCard.Suit;
                 // Use trump to take high card
@@ -78,7 +85,7 @@
                     // TODO: Refactor this to achieve HQC
                     var trump =
                        possibleCards.Where(c => c.Suit == context.TrumpCard.Suit)
-                            .OrderBy(this.GetCardPriority)
+                            .OrderBy(this.cardChooser.GetCardPriority)
                             .FirstOrDefault();
                     return this.PlayCard(trump);
                 }
@@ -91,9 +98,8 @@
 
                     return this.PlayCard(higherCard);
                 }
-
-                Card card;
-                card = possibleCards.Where(c => c.Suit != trumpSuit).OrderBy(c => c.GetValue()).FirstOrDefault();
+                
+                var card = possibleCards.Where(c => c.Suit != trumpSuit).OrderBy(c => c.GetValue()).FirstOrDefault();
                 //if (context.State.ShouldObserveRules)
                 //{
                 //    card = this.ChooseCardToPlay(this.allCards, context, possibleCards);
@@ -173,7 +179,7 @@
 
             if (currentGameState == GameStates.StartRoundState)
             {
-                var smallestCard = this.ChooseCardToPlay(this.allCards, context, possibleCards);
+                var smallestCard = this.cardChooser.ChooseCardToPlay(context, possibleCards);
 
                 return this.PlayCard(smallestCard);
             }
@@ -194,7 +200,6 @@
                 {
                     cardThatEnemyHasNotAsSuit = cardsByPower.LastOrDefault();
                     //cardThatEnemyHasNotAsSuit = this.ChooseCardToPlay(this.allCards, context, possibleCards);
-
                 }
 
                 return this.PlayCard(cardThatEnemyHasNotAsSuit);
@@ -231,83 +236,10 @@
                     return this.CloseGame();
                 }
 
-                //IEnumerable<Card> nonTrumpCards = this.Cards.Where(c => c.Suit != context.TrumpCard.Suit).OrderBy(c => c.GetValue());
-                //foreach (var card in nonTrumpCards)
-                //{
-                //    switch (card.Type)
-                //    {
-                //        case CardType.Nine:
-                //            return this.PlayCard(card);
-
-                //        case CardType.Jack:
-                //            return this.PlayCard(card);
-
-                //        case CardType.Queen:
-                //            {
-                //                if (!this.IsCardWaitingForAnnounce(card))
-                //                {
-                //                    return this.PlayCard(card);
-                //                }
-
-                //                break;
-                //            }
-
-                //        case CardType.King:
-                //            {
-                //                if (!this.IsCardWaitingForAnnounce(card))
-                //                {
-                //                    return this.PlayCard(card);
-                //                }
-
-                //                break;
-                //            }
-                //    }
-                //}
-
-                //cardToPlay = nonTrumpCards.FirstOrDefault();
-
-                cardToPlay = this.ChooseCardToPlay(this.allCards, context, possibleCards);
+                cardToPlay = this.cardChooser.ChooseCardToPlay(context, possibleCards);
             }
-
-            /*if (cardToPlay == null)
-            {
-                cardToPlay = possibleCardsToPlay.First(c => c.Suit != context.TrumpCard.Suit);
-            }*/
 
             return this.PlayCard(cardToPlay);
-        }
-
-        private int GetCardPriority(Card card)
-        {
-            switch (card.Type)
-            {
-                case CardType.Nine:
-                    return 0;
-                case CardType.Jack:
-                    return 0;
-                case CardType.Queen:
-                    return 1;
-                case CardType.King:
-                    return 1;
-                case CardType.Ace:
-                    return 2;
-                case CardType.Ten:
-                    return 2;
-                default:
-                    return 0;
-            }
-        }
-
-        private bool IsCardWaitingForAnnounce(Card card)
-        {
-            CardType otherTypeForAnnounce = card.Type == CardType.King ? CardType.Queen : CardType.King;
-            CardStatus statusOfOtherCard = this.allCards[card.Suit][otherTypeForAnnounce];
-            if (statusOfOtherCard == CardStatus.InDeckOrEnemy)
-            {
-                return true;
-            }
-
-            return false;
         }
 
         private bool CanCloseTheGame(PlayerTurnContext context)
@@ -536,128 +468,6 @@
                     }
                 }
             }
-        }
-
-        public int GetSuitPriority(
-            IDictionary<CardSuit, Dictionary<CardType, CardStatus>> allCardsToCheck,
-            CardSuit cardSuit)
-        {
-            return allCardsToCheck[cardSuit].Count(card => card.Value == CardStatus.Passed || card.Value == CardStatus.InStalker);
-        }
-
-        public int GetTrumpPriority(
-            IDictionary<CardSuit, Dictionary<CardType, CardStatus>> allCardsToCheck, CardSuit trumpSuit, PlayerTurnContext context)
-        {
-            var countOfTrump = this.GetSuitPriority(allCardsToCheck, trumpSuit);
-            if (context.CardsLeftInDeck != 0)
-            {
-                countOfTrump++;
-            }
-
-            return countOfTrump;
-        }
-
-        public int[] GetPriorityForEachSuit(
-            IDictionary<CardSuit, Dictionary<CardType, CardStatus>> allCardsToCheck, PlayerTurnContext context)
-        {
-            var prioritiesPerSuit = new int[4];
-            var trumpSuit = context.TrumpCard.Suit;
-            var trumpPriority = this.GetTrumpPriority(allCardsToCheck, trumpSuit, context);
-
-            if (context.State.ShouldObserveRules)
-            {
-                for (int i = 0; i < 4; i++)
-                {
-                    if ((int)trumpSuit != i)
-                    {
-                        prioritiesPerSuit[i] = this.GetSuitPriority(allCardsToCheck, (CardSuit)i) - trumpPriority;
-                    }
-                }
-            }
-            else
-            {
-                for (int i = 0; i < prioritiesPerSuit.Length; i++)
-                {
-                    prioritiesPerSuit[i] = trumpPriority;
-                }
-            }
-
-            return prioritiesPerSuit;
-        }
-
-        public Card ChooseCardToPlay(
-            IDictionary<CardSuit, Dictionary<CardType, CardStatus>> allCardsToCheck,
-            PlayerTurnContext context,
-            ICollection<Card> stalkerCards)
-        {
-            var trumpSuit = context.TrumpCard.Suit;
-            int highestPrioritySuit = 0;
-            int priorityValue = Int32.MaxValue;
-
-            // Get priorities for all suits
-            var suitsPriorities = this.GetPriorityForEachSuit(allCardsToCheck, context);
-
-            // Check which suits are available
-            var availableSuits = new int[4];
-            foreach (var card in stalkerCards)
-            {
-                int suit = (int)card.Suit;
-                availableSuits[suit]++;
-            }
-
-            for (int i = 0; i < suitsPriorities.Length; i++)
-            {
-                if ((int)trumpSuit == i || availableSuits[i] == 0)
-                {
-                    continue;
-                }
-
-                if (suitsPriorities[i] < priorityValue)
-                {
-                    highestPrioritySuit = i;
-                    priorityValue = suitsPriorities[i];
-                }
-            }
-
-            // Select the cards from the best suit
-            var cardsFromBestSuit = stalkerCards.Where(card => card.Suit == (CardSuit)highestPrioritySuit).OrderBy(this.GetCardPriority).ToList();
-            var cardsFromTrump = stalkerCards.Where(card => card.Suit == trumpSuit).OrderBy(this.GetCardPriority).ToList();
-
-            if (!context.State.ShouldObserveRules)
-            {
-                // Take all nontrump cards without Queen and King waiting for announce
-                cardsFromBestSuit = stalkerCards.Where(c => c.Suit != trumpSuit && !(this.GetCardPriority(c) == 1 && this.IsCardWaitingForAnnounce(c))).OrderBy(this.GetCardPriority).ToList();
-            }
-
-            // Sort cards by its priority
-            var cardsToChooseFrom = new List<Card>();
-            if (cardsFromBestSuit.Count != 0)
-            {
-                cardsToChooseFrom = cardsFromBestSuit;
-            }
-            else
-            {
-                cardsToChooseFrom = cardsFromTrump;
-            }
-
-            if (!context.State.ShouldObserveRules)
-            {
-                // THIS NUMBER WILL AFFECT THE DECISION OF THE STALKER WHEN IN OPEN STATE
-                if (priorityValue > 5)
-                {
-                    return cardsToChooseFrom.LastOrDefault();
-                }
-
-                return cardsToChooseFrom.FirstOrDefault();
-            }
-
-            // THIS NUMBER WILL AFFECT THE DECISION OF THE STALKER WHEN IN CLOSED STATE
-            if (priorityValue < -1)
-            {
-                return cardsToChooseFrom.LastOrDefault();
-            }
-
-            return cardsToChooseFrom.FirstOrDefault();
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿namespace Santase.AI.StalkerPlayer
+﻿namespace Santase.AI.StalkerPlayer.Common.Constants
 {
     public class GameStates
     {
