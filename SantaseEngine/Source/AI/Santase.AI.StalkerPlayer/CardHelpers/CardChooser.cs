@@ -10,24 +10,12 @@
 
     public class CardChooser : ICardChooser
     {
-        private Dictionary<CardSuit, Dictionary<CardType, CardStatus>> allCards;
 
-        public CardChooser(Dictionary<CardSuit, Dictionary<CardType, CardStatus>> allCards)
+        private readonly ICardHolder cardHolder;
+
+        public CardChooser(ICardHolder cardHolder)
         {
-            this.AllCards = allCards;
-        }
-
-        private Dictionary<CardSuit, Dictionary<CardType, CardStatus>> AllCards
-        {
-            get
-            {
-                return this.allCards;
-            }
-
-            set
-            {
-                this.allCards = value;
-            }
+            this.cardHolder = cardHolder;
         }
 
         public Card ChooseCardToPlay(PlayerTurnContext context, ICollection<Card> stalkerCards)
@@ -126,7 +114,7 @@
         private bool IsCardWaitingForAnnounce(Card card)
         {
             CardType otherTypeForAnnounce = card.Type == CardType.King ? CardType.Queen : CardType.King;
-            CardStatus statusOfOtherCard = this.AllCards[card.Suit][otherTypeForAnnounce];
+            CardStatus statusOfOtherCard = this.cardHolder.AllCards[card.Suit][otherTypeForAnnounce];
             if (statusOfOtherCard == CardStatus.InDeckOrEnemy)
             {
                 return true;
@@ -137,7 +125,7 @@
 
         private int GetSuitPriority(CardSuit cardSuit)
         {
-            return this.allCards[cardSuit].Count(card => card.Value == CardStatus.Passed || card.Value == CardStatus.InStalker);
+            return this.cardHolder.AllCards[cardSuit].Count(card => card.Value == CardStatus.Passed || card.Value == CardStatus.InStalker);
         }
 
         private int GetTrumpPriority(CardSuit trumpSuit, PlayerTurnContext context)
