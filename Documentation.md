@@ -11,4 +11,8 @@ A♥ from enemy. But if not success _10♥_ remains alone!
     we have cards: 9♥ A♥ J♣ 10♦ J♠ K♠
     to not play J♠ (keep K♠ for Q♠ if not passed)
 
+First play | Second play 
+---------- | -----------
+testas | test
+
 use separate collection for cards played form Stalker.

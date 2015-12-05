@@ -19,11 +19,14 @@
 
         private readonly ICardHelper cardHelper;
 
+        private readonly IHelperExtensions cardExtensions;
+
         public StalkerPlayer()
         {
             this.cardHelper = new CardHelper();
             this.cardHolder = new CardHolder();
             this.cardChooser = new CardChooser(this.cardHolder, this.cardHelper);
+            this.cardExtensions = new HelperExtensions(this.cardHolder);
         }
 
         public override string Name => "S.T.A.L.K.E.R";
@@ -62,47 +65,13 @@
             if (context.FirstPlayedCard == null &&
                 currentGameState == GameStates.MoreThanTwoCardsLeftRoundState &&
                 context.State.CanClose &&
-                this.CanCloseTheGame(context))
+                this.cardExtensions.CanCloseTheGame(context, this.Cards))
             {
                 return this.CloseGame();
             }
 
-            return this.PlayCard(context.FirstPlayedCard != null ? this.GetBestCardToRespond(context) : this.GetBestCardToPlayFirst(context));
-        }
-
-        private Card GetBestCardToRespond(PlayerTurnContext context)
-        {
-            var enemyCard = context.FirstPlayedCard;
-            var enemyCardPriority = this.cardHelper.GetCardPriority(enemyCard);
-            var possibleCards = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards);
-            var trumpSuit = context.TrumpCard.Suit;
-
-            // Use trump to take the enemy card in case it is with higher value
-            if (enemyCardPriority == 2 && enemyCard.Suit != trumpSuit && possibleCards.Any(c => c.Suit == trumpSuit))
-            {
-                // TODO: Change the trump card used to take enemy card
-                var trump =
-                   possibleCards.Where(c => c.Suit == context.TrumpCard.Suit)
-                        .OrderBy(this.cardHelper.GetCardPriority)
-                        .FirstOrDefault();
-                return trump;
-            }
-
-            // Try to take the played enemy card.
-            if (possibleCards.Any(c => c.Suit == enemyCard.Suit && c.GetValue() > enemyCard.GetValue()))
-            {
-                // TODO: Do not take weak cards
-                var higherCard =
-                    possibleCards.Where(c => c.Suit == enemyCard.Suit).OrderBy(c => c.GetValue()).LastOrDefault();
-
-                return higherCard;
-            }
-
-            // Else play the weakest card which is not trump.
-            var card = possibleCards.Where(c => c.Suit != trumpSuit).OrderBy(c => c.GetValue()).FirstOrDefault()
-                       ?? possibleCards.OrderBy(c => c.GetValue()).FirstOrDefault();
-
-            return card;
+            Card cardToPlay = context.FirstPlayedCard != null ? this.GetBestCardToRespond(context) : this.GetBestCardToPlayFirst(context);
+            return this.PlayCard(cardToPlay);
         }
 
         public override void EndTurn(PlayerTurnContext context)
@@ -152,7 +121,7 @@
         {
             var currentGameState = context.State.GetType().Name;
             var possibleCards = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards);
-            var cardToPlay = this.CheckForAnounce(context.TrumpCard.Suit, context.CardsLeftInDeck, currentGameState);
+            var cardToPlay = this.cardExtensions.CheckForAnounce(context.TrumpCard.Suit, context.CardsLeftInDeck, currentGameState, this.Cards);
 
             if (cardToPlay != null)
             {
@@ -170,14 +139,15 @@
                 var cardsByPower = this.Cards.OrderByDescending(c => c.GetValue());
                 foreach (var card in cardsByPower)
                 {
-                    if (this.EnemyContainsLowerCardThan(card) && !this.EnemyContainsGreaterCardThan(card))
+                    if (this.cardExtensions.ContainsLowerCardThan(card, CardStatus.InEnemy) &&
+                        !this.cardExtensions.ContainsGreaterCardThan(card, CardStatus.InEnemy))
                     {
                         return card;
                     }
                 }
 
                 bool enemyHasTrump = this.cardHolder.EnemyCards.Any(c => c.Suit == context.TrumpCard.Suit);
-                Card cardThatEnemyHasNotAsSuit = this.GetCardWithSuitThatEnemyHasNot(enemyHasTrump, context.TrumpCard.Suit);
+                Card cardThatEnemyHasNotAsSuit = this.cardExtensions.GetCardWithSuitThatEnemyHasNot(enemyHasTrump, context.TrumpCard.Suit, this.Cards);
                 if (cardThatEnemyHasNotAsSuit == null)
                 {
                     cardThatEnemyHasNotAsSuit = cardsByPower.LastOrDefault();
@@ -191,14 +161,14 @@
                 IEnumerable<Card> orderedByPower = this.Cards.OrderByDescending(c => c.GetValue());
                 Card trump = orderedByPower.FirstOrDefault(c => c.Suit == context.TrumpCard.Suit);
 
-                if (trump != null && !this.HasGreatherNonPassedCardThan(trump))
+                if (trump != null && !this.cardExtensions.ContainsGreaterCardThan(trump, CardStatus.InDeckOrEnemy))
                 {
                     return trump;
                 }
 
                 foreach (var card in orderedByPower)
                 {
-                    if (this.HasSmallerNonPassedCardThan(card))
+                    if (this.cardExtensions.ContainsLowerCardThan(card, CardStatus.InDeckOrEnemy))
                     {
                         return card;
                     }
@@ -221,149 +191,39 @@
             return cardToPlay;
         }
 
-        private bool CanCloseTheGame(PlayerTurnContext context)
+        private Card GetBestCardToRespond(PlayerTurnContext context)
         {
-            //// When we have A and 10 from trumps; necessary points && some other winning cards
-            //// In the current context we are first player.
-            var hasHighTrumps = this.cardHolder.AllCards[context.TrumpCard.Suit][CardType.Ace] == CardStatus.InStalker &&
-                                      this.cardHolder.AllCards[context.TrumpCard.Suit][CardType.Ten] == CardStatus.InStalker;
-            var has40 = this.cardHolder.AllCards[context.TrumpCard.Suit][CardType.King] == CardStatus.InStalker
-                         && this.cardHolder.AllCards[context.TrumpCard.Suit][CardType.Queen] == CardStatus.InStalker;
+            var enemyCard = context.FirstPlayedCard;
+            var enemyCardPriority = this.cardHelper.GetCardPriority(enemyCard);
+            var possibleCards = this.PlayerActionValidator.GetPossibleCardsToPlay(context, this.Cards);
+            var trumpSuit = context.TrumpCard.Suit;
 
-            var hasEnoughAfterAnounce = context.FirstPlayerRoundPoints > 25;
-
-            var hasNecessaryPoints = this.Cards.Sum(c => c.GetValue()) + context.FirstPlayerRoundPoints > 70;
-
-            var sureWiningCards = this.Cards.Count(card => !this.HasGreatherNonPassedCardThan(card));
-
-            if (has40 && hasEnoughAfterAnounce)
+            // Use trump to take the enemy card in case it is with higher value
+            if (enemyCardPriority == 2 && enemyCard.Suit != trumpSuit && possibleCards.Any(c => c.Suit == trumpSuit))
             {
-                return true;
+                // TODO: Change the trump card used to take enemy card
+                var trump =
+                   possibleCards.Where(c => c.Suit == context.TrumpCard.Suit)
+                        .OrderBy(this.cardHelper.GetCardPriority)
+                        .FirstOrDefault();
+                return trump;
             }
 
-            return hasHighTrumps && hasNecessaryPoints && sureWiningCards > 0;
-        }
-
-        private Card GetCardWithSuitThatEnemyHasNot(bool enemyHasATrumpCard, CardSuit trumpSuit)
-        {
-            if (!enemyHasATrumpCard)
+            // Try to take the played enemy card.
+            if (possibleCards.Any(c => c.Suit == enemyCard.Suit && c.GetValue() > enemyCard.GetValue()))
             {
-                //// In case enemy does not have any trump cards and we have a trump, should throw a trump;
-                var myTrumpCards = this.Cards.Where(c => c.Suit == trumpSuit).ToList();
-                if (myTrumpCards.Count() > 0)
-                {
-                    return myTrumpCards.OrderBy(c => c.GetValue()).LastOrDefault();
-                }
+                // TODO: Do not take weak cards
+                var higherCard =
+                    possibleCards.Where(c => c.Suit == enemyCard.Suit).OrderBy(c => c.GetValue()).LastOrDefault();
+
+                return higherCard;
             }
 
-            var orderedCards = this.Cards.OrderBy(c => c.GetValue());
-            foreach (var card in orderedCards)
-            {
-                if (this.cardHolder.EnemyCards.All(c => c.Suit != card.Suit))
-                {
-                    if (enemyHasATrumpCard)
-                    {
-                        return this.Cards.Where(c => c.Suit == card.Suit).OrderBy(c => c.GetValue()).First();
-                    }
+            // Else play the weakest card which is not trump.
+            var card = possibleCards.Where(c => c.Suit != trumpSuit).OrderBy(c => c.GetValue()).FirstOrDefault()
+                       ?? possibleCards.OrderBy(c => c.GetValue()).FirstOrDefault();
 
-                    return this.Cards.Where(c => c.Suit == card.Suit).OrderByDescending(c => c.GetValue()).First();
-                }
-            }
-
-            return null;
-        }
-
-        // TODO: Refactor in one method
-        private bool EnemyContainsLowerCardThan(Card card)
-        {
-            return this.cardHolder.AllCards[card.Suit].Any(c => c.Value == CardStatus.InEnemy && new Card(card.Suit, c.Key).GetValue() < card.GetValue());
-        }
-
-        private bool EnemyContainsGreaterCardThan(Card card)
-        {
-            return this.cardHolder.AllCards[card.Suit].Any(c => c.Value == CardStatus.InEnemy && new Card(card.Suit, c.Key).GetValue() > card.GetValue());
-        }
-
-        private bool HasGreatherNonPassedCardThan(Card card)
-        {
-            return this.cardHolder.AllCards[card.Suit].Any(c => c.Value == CardStatus.InDeckOrEnemy && new Card(card.Suit, c.Key).GetValue() > card.GetValue());
-        }
-
-        private bool HasSmallerNonPassedCardThan(Card card)
-        {
-            return this.cardHolder.AllCards[card.Suit].Any(c => c.Value == CardStatus.InDeckOrEnemy && new Card(card.Suit, c.Key).GetValue() < card.GetValue());
-        }
-
-        private Card CheckForAnounce(CardSuit trumpSuit, int cardsLeftInDeck, string state)
-        {
-            if (state == GameStates.StartRoundState)
-            {
-                return null;
-            }
-
-            IList<Card> announcePairs = new List<Card>();
-
-            foreach (var card in this.Cards)
-            {
-                if (card.Type == CardType.King || card.Type == CardType.Queen)
-                {
-                    var otherTypeForAnnounce = card.Type == CardType.King ? CardType.Queen : CardType.King;
-                    var otherCardForAnnounce = new Card(card.Suit, otherTypeForAnnounce);
-
-                    if (this.cardHolder.AllCards[card.Suit][otherTypeForAnnounce] == CardStatus.InStalker)
-                    {
-                        announcePairs.Add(card);
-                        announcePairs.Add(otherCardForAnnounce);
-                    }
-                }
-            }
-
-            if (announcePairs.Count == 0)
-            {
-                return null;
-            }
-
-            //// Check if it's forty.
-            if (announcePairs.Any(c => c.Suit == trumpSuit))
-            {
-                CardStatus cardStatusForTen = this.cardHolder.AllCards[trumpSuit][CardType.Ten];
-                CardStatus cardStatusForAce = this.cardHolder.AllCards[trumpSuit][CardType.Ace];
-
-                if ((cardStatusForTen == CardStatus.Passed || cardStatusForTen == CardStatus.InStalker) &&
-                        (cardStatusForAce == CardStatus.Passed || cardStatusForAce == CardStatus.InStalker))
-                {
-                    return new Card(trumpSuit, CardType.King);
-                }
-                else
-                {
-                    return new Card(trumpSuit, CardType.Queen);
-                }
-            }
-            else
-            {
-                var cardToReturn = new Card(announcePairs[0].Suit, announcePairs[0].Type);
-
-                //// They will be ordered in this way: [Q♦ K♦; K♠ Q♠; К♣ Q♣] by pairs: two diamonds, two clubs e.t.c. so incrementation will be i+=2
-                for (int i = 0; i < announcePairs.Count; i += 2)
-                {
-                    CardSuit currentSuit = announcePairs[i].Suit;
-                    CardStatus cardStatusForTen = this.cardHolder.AllCards[currentSuit][CardType.Ten];
-                    CardStatus cardStatusForAce = this.cardHolder.AllCards[currentSuit][CardType.Ace];
-
-                    //// Return bigger if 10 and A of current Suit is passed or is in us. But it could look suspicious for enemy if we throw a King.
-                    if ((cardStatusForTen == CardStatus.Passed || cardStatusForTen == CardStatus.InStalker) &&
-                        (cardStatusForAce == CardStatus.Passed || cardStatusForAce == CardStatus.InStalker))
-                    {
-                        return new Card(currentSuit, CardType.King);
-                    }
-                    else
-                    {
-                        cardToReturn = new Card(currentSuit, CardType.Queen);
-                    }
-                }
-
-                return cardToReturn;
-            }
+            return card;
         }
     }
 }
