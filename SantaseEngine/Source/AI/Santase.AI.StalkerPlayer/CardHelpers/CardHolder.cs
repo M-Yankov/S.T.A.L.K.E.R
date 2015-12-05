@@ -46,16 +46,12 @@
                 this.AllCards[card.Suit][card.Type] = CardStatus.InStalker;
             }
 
-            var result = new List<Card>();
-
             foreach (var cardSuit in this.cardSuits)
             {
                 foreach (var cardType in this.cardTypes)
                 {
                     if (!cards.Contains(new Card(cardSuit, cardType)))
                     {
-                        result.Add(new Card(cardSuit, cardType));
-
                         if (!this.AllCards[cardSuit].ContainsKey(cardType))
                         {
                             this.AllCards[cardSuit].Add(cardType, CardStatus.InDeckOrEnemy);

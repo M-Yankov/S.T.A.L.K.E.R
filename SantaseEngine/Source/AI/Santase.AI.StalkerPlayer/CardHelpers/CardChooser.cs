@@ -10,7 +10,6 @@
 
     public class CardChooser : ICardChooser
     {
-
         private readonly ICardHolder cardHolder;
 
         public CardChooser(ICardHolder cardHolder)
@@ -21,8 +20,8 @@
         public Card ChooseCardToPlay(PlayerTurnContext context, ICollection<Card> stalkerCards)
         {
             var trumpSuit = context.TrumpCard.Suit;
-            int highestPrioritySuit = 0;
-            int priorityValue = int.MaxValue;
+            var highestPrioritySuit = 0;
+            var priorityValue = int.MaxValue;
 
             // Get priorities for all suits
             var suitsPriorities = this.GetPriorityForEachSuit(context);
@@ -31,11 +30,11 @@
             var availableSuits = new int[4];
             foreach (var card in stalkerCards)
             {
-                int suit = (int)card.Suit;
+                var suit = (int)card.Suit;
                 availableSuits[suit]++;
             }
 
-            for (int i = 0; i < suitsPriorities.Length; i++)
+            for (var i = 0; i < suitsPriorities.Length; i++)
             {
                 if ((int)trumpSuit == i || availableSuits[i] == 0)
                 {
@@ -60,34 +59,16 @@
             }
 
             // Sort cards by its priority
-            var cardsToChooseFrom = new List<Card>();
-            if (cardsFromBestSuit.Count != 0)
-            {
-                cardsToChooseFrom = cardsFromBestSuit;
-            }
-            else
-            {
-                cardsToChooseFrom = cardsFromTrump;
-            }
+            var cardsToChooseFrom = cardsFromBestSuit.Count != 0 ? cardsFromBestSuit : cardsFromTrump;
 
             if (!context.State.ShouldObserveRules)
             {
                 // THIS NUMBER WILL AFFECT THE DECISION OF THE STALKER WHEN IN OPEN STATE
-                if (priorityValue > 5)
-                {
-                    return cardsToChooseFrom.LastOrDefault();
-                }
-
-                return cardsToChooseFrom.FirstOrDefault();
+                return priorityValue > 5 ? cardsToChooseFrom.LastOrDefault() : cardsToChooseFrom.FirstOrDefault();
             }
 
             // THIS NUMBER WILL AFFECT THE DECISION OF THE STALKER WHEN IN CLOSED STATE
-            if (priorityValue < -1)
-            {
-                return cardsToChooseFrom.LastOrDefault();
-            }
-
-            return cardsToChooseFrom.FirstOrDefault();
+            return priorityValue < -1 ? cardsToChooseFrom.LastOrDefault() : cardsToChooseFrom.FirstOrDefault();
         }
 
         public int GetCardPriority(Card card)
@@ -113,14 +94,9 @@
 
         private bool IsCardWaitingForAnnounce(Card card)
         {
-            CardType otherTypeForAnnounce = card.Type == CardType.King ? CardType.Queen : CardType.King;
-            CardStatus statusOfOtherCard = this.cardHolder.AllCards[card.Suit][otherTypeForAnnounce];
-            if (statusOfOtherCard == CardStatus.InDeckOrEnemy)
-            {
-                return true;
-            }
-
-            return false;
+            var otherTypeForAnnounce = card.Type == CardType.King ? CardType.Queen : CardType.King;
+            var statusOfOtherCard = this.cardHolder.AllCards[card.Suit][otherTypeForAnnounce];
+            return statusOfOtherCard == CardStatus.InDeckOrEnemy;
         }
 
         private int GetSuitPriority(CardSuit cardSuit)
@@ -147,7 +123,7 @@
 
             if (context.State.ShouldObserveRules)
             {
-                for (int i = 0; i < 4; i++)
+                for (var i = 0; i < 4; i++)
                 {
                     if ((int)trumpSuit != i)
                     {
@@ -157,7 +133,7 @@
             }
             else
             {
-                for (int i = 0; i < prioritiesPerSuit.Length; i++)
+                for (var i = 0; i < prioritiesPerSuit.Length; i++)
                 {
                     prioritiesPerSuit[i] = trumpPriority;
                 }
