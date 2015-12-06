@@ -41,36 +41,17 @@
 
         public void Initialize(ICollection<Card> cards)
         {
-            foreach (var card in cards)
-            {
-                this.AllCards[card.Suit][card.Type] = CardStatus.InStalker;
-            }
-
             foreach (var cardSuit in this.cardSuits)
             {
                 foreach (var cardType in this.cardTypes)
                 {
                     if (!cards.Contains(new Card(cardSuit, cardType)))
                     {
-                        if (!this.AllCards[cardSuit].ContainsKey(cardType))
-                        {
-                            this.AllCards[cardSuit].Add(cardType, CardStatus.InDeckOrEnemy);
-                        }
-                        else
-                        {
-                            this.AllCards[cardSuit][cardType] = CardStatus.InDeckOrEnemy;
-                        }
+                        this.AllCards[cardSuit][cardType] = CardStatus.InDeckOrEnemy;
                     }
                     else
                     {
-                        if (!this.AllCards[cardSuit].ContainsKey(cardType))
-                        {
-                            this.AllCards[cardSuit].Add(cardType, CardStatus.InStalker);
-                        }
-                        else
-                        {
-                            this.AllCards[cardSuit][cardType] = CardStatus.InStalker;
-                        }
+                        this.AllCards[cardSuit][cardType] = CardStatus.InStalker;
                     }
                 }
             }
