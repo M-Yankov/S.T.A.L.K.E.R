@@ -42,17 +42,20 @@
  1. _Priority_ logic:
     - ...
  1. Cards storage -
-    ```C#
+    
+    ```CSharp
     CardSuit[] allCardSuit;
     CardType[] allCardTypes;
-    IList<Card>
-    enemyCards;
+    IList<Card> enemyCards;
     IDictionary<CardSuit, Dictionary<CardType, CardStatus>> allCards;
     ```
- The constant access to object is the fastest way get it. Example:
+    
+    The constant access to object is the fastest way get it. Example:
+    
     ```C#
     this.allCards[CardSuit.Club][CardType.Ace] // gets or sets card status;
     ```
+    
  2. Additional logic when enemy has an announce gets other card from announce. Example:
     ```
     Enemy announces 20 with `K♣`, the stalker player must know about other card `Q♣` that is in enemy.
