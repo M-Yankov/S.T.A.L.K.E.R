@@ -67,7 +67,7 @@
                 return this.CloseGame();
             }
 
-            Card cardToPlay = context.FirstPlayedCard != null ? this.GetBestCardToRespond(context) : this.GetBestCardToPlayFirst(context);
+            var cardToPlay = context.FirstPlayedCard != null ? this.GetBestCardToRespond(context) : this.GetBestCardToPlayFirst(context);
             return this.PlayCard(cardToPlay);
         }
 

@@ -40,11 +40,11 @@
 
         public bool CanCloseTheGame(PlayerTurnContext context, ICollection<Card> playerCards)
         {
-            // When we have A and 10 from trumps; necessary points && some other winning cards.
+            // Stalker has A and 10 from trumps, certain ammount of points and some other winning cards.
             var hasHighTrumps = this.cardHolder.AllCards[context.TrumpCard.Suit][CardType.Ace] == CardStatus.InStalker &&
                                       this.cardHolder.AllCards[context.TrumpCard.Suit][CardType.Ten] == CardStatus.InStalker;
 
-            // When we have 40 and we are already above certain points.
+            // Stalker has 40 and is already above certain points.
             var has40 = this.cardHolder.AllCards[context.TrumpCard.Suit][CardType.King] == CardStatus.InStalker
                          && this.cardHolder.AllCards[context.TrumpCard.Suit][CardType.Queen] == CardStatus.InStalker;
 
@@ -66,7 +66,7 @@
         {
             if (!enemyHasATrumpCard)
             {
-                // In case enemy does not have any trump cards and we have a trump, should throw a trump.
+                // In case the enemy does not have any trump cards and Stalker has a trump, he should throw a trump.
                 var myTrumpCards = playerCards.Where(c => c.Suit == trumpSuit).ToList();
                 if (myTrumpCards.Count() > 0)
                 {
@@ -140,9 +140,9 @@
             // They will be ordered in this way: [Q♦ K♦; K♠ Q♠; К♣ Q♣] by pairs: two diamonds, two clubs e.t.c. so incrementation will be i+=2.
             for (int i = 0; i < announcePairs.Count; i += 2)
             {
-                CardSuit currentSuit = announcePairs[i].Suit;
-                CardStatus cardStatusForTen = this.cardHolder.AllCards[currentSuit][CardType.Ten];
-                CardStatus cardStatusForAce = this.cardHolder.AllCards[currentSuit][CardType.Ace];
+                var currentSuit = announcePairs[i].Suit;
+                var cardStatusForTen = this.cardHolder.AllCards[currentSuit][CardType.Ten];
+                var cardStatusForAce = this.cardHolder.AllCards[currentSuit][CardType.Ace];
 
                 // Return bigger if 10 and A of current Suit is passed or is in us.
                 if ((cardStatusForTen == CardStatus.Passed || cardStatusForTen == CardStatus.InStalker) &&
