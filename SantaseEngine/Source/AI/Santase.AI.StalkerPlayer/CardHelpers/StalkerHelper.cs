@@ -48,9 +48,9 @@
             var has40 = this.cardHolder.AllCards[context.TrumpCard.Suit][CardType.King] == CardStatus.InStalker
                          && this.cardHolder.AllCards[context.TrumpCard.Suit][CardType.Queen] == CardStatus.InStalker;
 
-            var hasEnoughAfterAnounce = context.FirstPlayerRoundPoints > 26;
+            var hasEnoughAfterAnounce = context.FirstPlayerRoundPoints > StalkerHelperConstants.CloseGamePointsBeforeAnnounce;
 
-            var hasNecessaryPoints = playerCards.Sum(c => c.GetValue()) + context.FirstPlayerRoundPoints > 70;
+            var hasNecessaryPoints = playerCards.Sum(c => c.GetValue()) + context.FirstPlayerRoundPoints > StalkerHelperConstants.CloseGameMinimumPoints;
 
             var sureWiningCards = playerCards.Count(card => !this.ContainsGreaterCardThan(card, CardStatus.InDeckOrEnemy));
 

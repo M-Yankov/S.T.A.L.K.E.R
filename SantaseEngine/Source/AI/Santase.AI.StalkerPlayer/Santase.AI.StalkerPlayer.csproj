@@ -46,6 +46,7 @@
     <Compile Include="Common\CardStatus.cs" />
     <Compile Include="Common\Constants\CardChooserConstants.cs" />
     <Compile Include="Common\Constants\GameStates.cs" />
+    <Compile Include="Common\Constants\StalkerHelperConstants.cs" />
     <Compile Include="Contracts\ICardChooser.cs" />
     <Compile Include="Contracts\IStalkerHelper.cs" />
     <Compile Include="Contracts\ICardHolder.cs" />
